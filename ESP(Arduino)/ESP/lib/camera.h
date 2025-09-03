@@ -3,6 +3,8 @@
 
 #include "esp_camera.h"
 #include <Arduino.h>
+#include "dl_lib.h"
+#include "face.h"
 
 /*-----------------------------------------
 Default Camera methods
