@@ -1,18 +1,22 @@
 #include <Arduino.h>
+#include "../lib/camera.h"
 
-// put function declarations here:
-int myFunction(int, int);
+static const char* TAG = "MAIN";
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  Serial.begin(115200);
+
+  delay(1000);  // small delay for clear logging
+
+  Serial.printf("[%s] Begin setup\r\n", TAG);
+
+  initCamera();
+  setCameraSettings();
+
+  Serial.printf("[%s] Completed setup\r\n", TAG);
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
-}
-
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+  delay(5000);
+  Serial.printf("\nIn Loop\r\n");
 }
