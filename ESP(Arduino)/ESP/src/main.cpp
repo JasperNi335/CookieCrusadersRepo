@@ -18,5 +18,11 @@ void setup() {
 
 void loop() {
   delay(5000);
-  Serial.printf("\nIn Loop\r\n");
+  
+  if (!sendPhotoSerial()){
+    Serial.printf("[%s] Sending Photo Failed\r\n", TAG);
+  }else{
+    Serial.printf("[%s] Sending Photo Complete\r\n", TAG);
+  }
+  
 }
