@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include <string.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #define TAG "DETECTION"
 
@@ -10,19 +11,45 @@
 #define DS_H 60
 
 // Minimum detection box (full resolution)
-#define MIN_FACE_W 40
-#define MIN_FACE_H 40
+#define MIN_FACE_W 5
+#define MIN_FACE_H 5
 
-// Skin detection in YCrCb
-// Tuned for your face color (avg rgb(122,88,93))
-#define MIN_CR 132
-#define MAX_CR 140
-#define MIN_CB 135
-#define MAX_CB 145
+// Skin detection in YCrCb (tuned for avg rgb(122,117,124))
+#define MIN_CR 135
+#define MAX_CR 150
+#define MIN_CB 120
+#define MAX_CB 130
+#define MIN_Y  60 
+#define MAX_Y 110
 
 // Buffers
 static uint16_t small_buf[DS_W*DS_H];
 static uint8_t skin_mask[DS_W*DS_H];
+
+// Flood-fill stack (heap allocated once)
+static int (*ff_stack)[2] = NULL;
+static int ff_stack_size = 0;
+
+// Allocate flood-fill stack once
+static bool ensure_ff_stack(void) {
+    int required = DS_W * DS_H;
+    if (ff_stack && ff_stack_size >= required) return true;
+
+    // free old if smaller
+    if (ff_stack) {
+        free(ff_stack);
+        ff_stack = NULL;
+        ff_stack_size = 0;
+    }
+
+    ff_stack = (int(*)[2])malloc(sizeof(int[DS_W*DS_H][2]));
+    if (!ff_stack) {
+        ESP_LOGE(TAG, "Failed to allocate flood-fill stack");
+        return false;
+    }
+    ff_stack_size = required;
+    return true;
+}
 
 // Convert RGB565 -> YCrCb
 static inline void rgb565_to_ycrcb(uint16_t px, uint8_t *y, uint8_t *cr, uint8_t *cb){
@@ -39,9 +66,18 @@ static inline void rgb565_to_ycrcb(uint16_t px, uint8_t *y, uint8_t *cr, uint8_t
 static inline int is_skin(uint16_t px){
     uint8_t y, cr, cb;
     rgb565_to_ycrcb(px, &y, &cr, &cb);
-    return (cr >= MIN_CR && cr <= MAX_CR &&
-            cb >= MIN_CB && cb <= MAX_CB);
+
+    int skin = (y >= MIN_Y && y <= MAX_Y &&
+                cr >= MIN_CR && cr <= MAX_CR &&
+                cb >= MIN_CB && cb <= MAX_CB);
+
+    if(skin) {
+        ESP_LOGI(TAG, "Skin pixel detected: Y=%d Cr=%d Cb=%d", y, cr, cb);
+    }
+
+    return skin;
 }
+
 
 // Downscale frame to DS_W*DS_H
 static void downscale_frame(camera_fb_t *fb){
@@ -59,22 +95,26 @@ static void downscale_frame(camera_fb_t *fb){
 
 // Flood-fill to find connected skin regions (8-connectivity)
 static int flood_fill(int x, int y, int *min_x, int *min_y, int *max_x, int *max_y){
-    int stack[DS_W*DS_H][2];
+    if (!ff_stack) return 0; // no memory allocated
+
     int top = 0;
-    stack[top][0] = x; stack[top][1] = y; top++;
+    ff_stack[top][0] = x;
+    ff_stack[top][1] = y;
+    top++;
 
     *min_x = x; *min_y = y; *max_x = x; *max_y = y;
     int count = 0;
 
     while(top > 0){
         top--;
-        int cx = stack[top][0];
-        int cy = stack[top][1];
+        int cx = ff_stack[top][0];
+        int cy = ff_stack[top][1];
 
         if(cx<0 || cy<0 || cx>=DS_W || cy>=DS_H) continue;
-        if(!skin_mask[cy*DS_W + cx]) continue;
+        int idx = cy*DS_W + cx;
+        if(!skin_mask[idx]) continue;
 
-        skin_mask[cy*DS_W + cx] = 0;
+        skin_mask[idx] = 0;
         count++;
 
         if(cx < *min_x) *min_x = cx;
@@ -82,25 +122,27 @@ static int flood_fill(int x, int y, int *min_x, int *min_y, int *max_x, int *max
         if(cx > *max_x) *max_x = cx;
         if(cy > *max_y) *max_y = cy;
 
-        // 8-connectivity neighbors
-        int nx[8] = {cx+1, cx-1, cx, cx, cx+1, cx-1, cx+1, cx-1};
-        int ny[8] = {cy, cy, cy+1, cy-1, cy+1, cy+1, cy-1, cy-1};
-
-        for(int i=0;i<8;i++){
-            if(top < DS_W*DS_H){
-                stack[top][0] = nx[i];
-                stack[top][1] = ny[i];
-                top++;
-            }
+        // push neighbors if space
+        if(top + 8 <= ff_stack_size){
+            ff_stack[top][0] = cx+1; ff_stack[top][1] = cy; top++;
+            ff_stack[top][0] = cx-1; ff_stack[top][1] = cy; top++;
+            ff_stack[top][0] = cx;   ff_stack[top][1] = cy+1; top++;
+            ff_stack[top][0] = cx;   ff_stack[top][1] = cy-1; top++;
+            ff_stack[top][0] = cx+1; ff_stack[top][1] = cy+1; top++;
+            ff_stack[top][0] = cx-1; ff_stack[top][1] = cy+1; top++;
+            ff_stack[top][0] = cx+1; ff_stack[top][1] = cy-1; top++;
+            ff_stack[top][0] = cx-1; ff_stack[top][1] = cy-1; top++;
         }
     }
 
     return count;
 }
 
-// Detect faces
+// Detect faces (largest blob only)
 int detect_faces(camera_fb_t *fb, int *x_arr, int *y_arr, int *w_arr, int *h_arr){
-    if(!fb) return 0;
+    if(!fb || !x_arr || !y_arr || !w_arr || !h_arr) return 0;
+    if(fb->width < DS_W || fb->height < DS_H) return 0;
+    if(!ensure_ff_stack()) return 0;
 
     downscale_frame(fb);
 
@@ -109,61 +151,73 @@ int detect_faces(camera_fb_t *fb, int *x_arr, int *y_arr, int *w_arr, int *h_arr
         skin_mask[i] = is_skin(small_buf[i]);
     }
 
-    memset(x_arr,0,sizeof(int)*MAX_FACES);
-    memset(y_arr,0,sizeof(int)*MAX_FACES);
-    memset(w_arr,0,sizeof(int)*MAX_FACES);
-    memset(h_arr,0,sizeof(int)*MAX_FACES);
-
-    int faces = 0;
     int scale_x = fb->width / DS_W;
     int scale_y = fb->height / DS_H;
+
+    // Best blob so far
+    int best_area = 0;
+    int best_x=0, best_y=0, best_w=0, best_h=0;
 
     for(int y=0;y<DS_H;y++){
         for(int x=0;x<DS_W;x++){
             if(!skin_mask[y*DS_W + x]) continue;
 
             int min_x, min_y, max_x, max_y;
-            flood_fill(x, y, &min_x, &min_y, &max_x, &max_y);
+            int count = flood_fill(x, y, &min_x, &min_y, &max_x, &max_y);
 
             int w_full = (max_x - min_x + 1) * scale_x;
             int h_full = (max_y - min_y + 1) * scale_y;
+            int area   = w_full * h_full;
 
-            // Only consider minimum size faces
-            if(w_full >= MIN_FACE_W && h_full >= MIN_FACE_H && faces < MAX_FACES){
-                x_arr[faces] = min_x * scale_x;
-                y_arr[faces] = min_y * scale_y;
-                w_arr[faces] = w_full;
-                h_arr[faces] = h_full;
-                faces++;
+            // Only consider blobs large enough
+            if(w_full >= MIN_FACE_W && h_full >= MIN_FACE_H){
+                if(area > best_area){
+                    best_area = area;
+                    best_x = min_x * scale_x;
+                    best_y = min_y * scale_y;
+                    best_w = w_full;
+                    best_h = h_full;
+                }
             }
         }
     }
 
-    return faces;
+    if(best_area > 0){
+        x_arr[0] = best_x;
+        y_arr[0] = best_y;
+        w_arr[0] = best_w;
+        h_arr[0] = best_h;
+        return 1; // one face (largest blob)
+    }
+
+    return 0; // none
 }
 
-// Draw detection boxes
+// Draw detection box
 void draw_faces(camera_fb_t *fb, int *x, int *y, int *w, int *h, int num_faces){
-    if(!fb) return;
+    if(!fb || num_faces <= 0 || !x || !y || !w || !h) return;
     uint16_t *img = (uint16_t*)fb->buf;
     uint16_t color = 0x07E0; // bright green
 
-    for(int i=0;i<num_faces;i++){
-        int x0 = x[i];
-        int y0 = y[i];
-        int x1 = x0 + w[i];
-        int y1 = y0 + h[i];
+    int x0 = x[0];
+    int y0 = y[0];
+    int x1 = x0 + w[0];
+    int y1 = y0 + h[0];
 
-        // Top & bottom
-        for(int xx=x0;xx<=x1 && xx<fb->width;xx++){
-            if(y0>=0 && y0<fb->height) img[y0*fb->width + xx] = color;
-            if(y1>=0 && y1<fb->height) img[y1*fb->width + xx] = color;
-        }
+    if(x0 < 0) x0 = 0;
+    if(y0 < 0) y0 = 0;
+    if(x1 >= fb->width)  x1 = fb->width-1;
+    if(y1 >= fb->height) y1 = fb->height-1;
 
-        // Left & right
-        for(int yy=y0;yy<=y1 && yy<fb->height;yy++){
-            if(x0>=0 && x0<fb->width) img[yy*fb->width + x0] = color;
-            if(x1>=0 && x1<fb->width) img[yy*fb->width + x1] = color;
-        }
+    // Top & bottom
+    for(int xx=x0; xx<=x1; xx++){
+        img[y0*fb->width + xx] = color;
+        img[y1*fb->width + xx] = color;
+    }
+
+    // Left & right
+    for(int yy=y0; yy<=y1; yy++){
+        img[yy*fb->width + x0] = color;
+        img[yy*fb->width + x1] = color;
     }
 }

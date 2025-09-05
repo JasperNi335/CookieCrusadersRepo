@@ -6,8 +6,6 @@
 
 #define DS_W 80
 #define DS_H 60
-#define MIN_FACE_W 20
-#define MIN_FACE_H 20
 
 #define MAX_FACES 3
 

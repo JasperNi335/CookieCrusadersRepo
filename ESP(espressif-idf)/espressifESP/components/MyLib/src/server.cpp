@@ -53,7 +53,7 @@ esp_err_t get_stream_handler(httpd_req_t* request) {
     }
 
     // Buffers for JPEG encoding
-    static uint8_t *jpg_buffer = NULL;
+    uint8_t *jpg_buffer = NULL;
     size_t jpg_len = 0;
 
     // Maximum faces we can handle
