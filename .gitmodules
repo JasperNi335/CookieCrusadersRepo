@@ -5,3 +5,7 @@
 [submodule "ESP(espressif-idf)/espressifESP/components/esp_camera"]
 	path = ESP(espressif-idf)/espressifESP/components/esp_camera
 	url = https://github.com/espressif/esp32-camera.git
+[submodule "ESP(espressif-idf)/espressifESP/components/esp-who"]
+	path = ESP(espressif-idf)/espressifESP/components/esp-who
+	url = https://github.com/espressif/esp-who.git
+	branch = release/v1.1.0

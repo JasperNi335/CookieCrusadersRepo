@@ -1,4 +1,5 @@
 #include <cstdio>
+#include "camera.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "camera.h"
