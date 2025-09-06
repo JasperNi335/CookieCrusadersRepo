@@ -66,12 +66,14 @@ esp_err_t get_stream_handler(httpd_req_t* request) {
             continue;
         }
 
+        
         // --- Detect skin blobs ---
         int num_faces = detect_faces(fb, x, y, w, h);
 
         // --- Draw rectangles on the frame ---
         draw_faces(fb, x, y, w, h, num_faces);
 
+        
         // --- JPEG encode ---
         if(!frame2jpg(fb, 80, &jpg_buffer, &jpg_len)) {
             ESP_LOGE(TAG, "JPEG encoding failed");
@@ -87,6 +89,7 @@ esp_err_t get_stream_handler(httpd_req_t* request) {
             break;
         }
 
+        
         // --- Send MJPEG part header ---
         char header[128];
         int header_len = snprintf(header, sizeof(header), _STREAM_PART, jpg_len);

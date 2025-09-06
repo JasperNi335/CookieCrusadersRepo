@@ -15,12 +15,12 @@
 #define MIN_FACE_H 5
 
 // Skin detection in YCrCb (tuned for avg rgb(122,117,124))
-#define MIN_CR 135
-#define MAX_CR 150
-#define MIN_CB 120
-#define MAX_CB 130
-#define MIN_Y  60 
-#define MAX_Y 110
+#define MIN_Y 191
+#define MAX_Y 211
+#define MIN_CR 128
+#define MAX_CR 148
+#define MIN_CB 105
+#define MAX_CB 125
 
 // Buffers
 static uint16_t small_buf[DS_W*DS_H];
@@ -163,7 +163,7 @@ int detect_faces(camera_fb_t *fb, int *x_arr, int *y_arr, int *w_arr, int *h_arr
             if(!skin_mask[y*DS_W + x]) continue;
 
             int min_x, min_y, max_x, max_y;
-            int count = flood_fill(x, y, &min_x, &min_y, &max_x, &max_y);
+            flood_fill(x, y, &min_x, &min_y, &max_x, &max_y);
 
             int w_full = (max_x - min_x + 1) * scale_x;
             int h_full = (max_y - min_y + 1) * scale_y;

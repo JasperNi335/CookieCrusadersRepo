@@ -25,6 +25,10 @@ camera_fb_t* cameraCapturePhoto();
 // user needs to free the buffer
 char* fb_to_b64(camera_fb_t* frame_buffer);
 
+void kuwahara_filter(camera_fb_t* fb);
+
+void blur_rgb565(camera_fb_t* fb);
+
 /*-----------------------------------------
 Serial Camera methods
 -----------------------------------------*/

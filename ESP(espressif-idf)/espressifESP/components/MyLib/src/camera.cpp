@@ -80,8 +80,8 @@ void setCameraSettings(){
     }
 
     // Brightness, contrast, saturation
-    s->set_brightness(s, 1);    // neutral
-    s->set_contrast(s, 1);      // slightly higher contrast to separate skin from background
+    s->set_brightness(s, 0);    // neutral
+    s->set_contrast(s, 0);      // slightly higher contrast to separate skin from background
     s->set_saturation(s, 0);    // slightly saturated to make skin colors pop
 
     // Disable automatic exposure & gain
@@ -89,7 +89,7 @@ void setCameraSettings(){
     s->set_aec2(s, 0);          // disable AEC
     s->set_agc_gain(s, 0);      // fixed gain
     s->set_gain_ctrl(s, 0);     // disable auto gain
-    s->set_aec_value(s, 1200);
+    s->set_aec_value(s, 200);
 
     // Optional: enable manual white balance to stabilize colors
     s->set_whitebal(s, 1);      // disable auto white balance
@@ -100,6 +100,132 @@ void setCameraSettings(){
     s->set_vflip(s, 0);
 
     ESP_LOGI(TAG, "Camera Settings applied\n");
+}
+
+// Helper: get pixel RGB from RGB565
+static inline void rgb565_to_rgb(uint16_t px, uint8_t* r, uint8_t* g, uint8_t* b){
+    *r = ((px >> 11) & 0x1F) << 3;
+    *g = ((px >> 5) & 0x3F) << 2;
+    *b = (px & 0x1F) << 3;
+}
+
+// Helper: convert RGB back to RGB565
+static inline uint16_t rgb_to_rgb565(uint8_t r, uint8_t g, uint8_t b){
+    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+}
+
+#define KUWAHARA_WINDOW 5 
+
+void kuwahara_filter(camera_fb_t* fb){
+    if(!fb) return;
+
+    int width = fb->width;
+    int height = fb->height;
+    uint16_t* img = (uint16_t*)fb->buf;
+
+    uint16_t* tmp_buf = (uint16_t*)malloc(width * height * sizeof(uint16_t));
+    if(!tmp_buf) return;
+
+    int w = KUWAHARA_WINDOW / 2;
+
+    for(int y=0; y<height; y++){
+        for(int x=0; x<width; x++){
+            int r_avg[4] = {0}, g_avg[4] = {0}, b_avg[4] = {0};
+            int n[4] = {0};
+
+            // 4 quadrants
+            for(int q=0;q<4;q++){
+                int x_start = (q%2==0) ? x-w : x;
+                int x_end   = (q%2==0) ? x : x+w;
+                int y_start = (q<2) ? y-w : y;
+                int y_end   = (q<2) ? y : y+w;
+
+                for(int yy=y_start; yy<=y_end; yy++){
+                    for(int xx=x_start; xx<=x_end; xx++){
+                        if(xx<0 || yy<0 || xx>=width || yy>=height) continue;
+                        uint8_t r,g,b;
+                        rgb565_to_rgb(img[yy*width + xx], &r, &g, &b);
+                        r_avg[q] += r;
+                        g_avg[q] += g;
+                        b_avg[q] += b;
+                        n[q]++;
+                    }
+                }
+
+                if(n[q]>0){
+                    r_avg[q] /= n[q];
+                    g_avg[q] /= n[q];
+                    b_avg[q] /= n[q];
+                }
+            }
+
+            // choose quadrant with smallest variance (simplified: choose quadrant with lowest sum of RGB variance)
+            int best_q = 0;
+            int min_var = 0x7FFFFFFF;
+            for(int q=0;q<4;q++){
+                int var = r_avg[q]*r_avg[q] + g_avg[q]*g_avg[q] + b_avg[q]*b_avg[q];
+                if(var < min_var){
+                    min_var = var;
+                    best_q = q;
+                }
+            }
+
+            tmp_buf[y*width + x] = rgb_to_rgb565(r_avg[best_q], g_avg[best_q], b_avg[best_q]);
+        }
+    }
+
+    // copy back
+    memcpy(img, tmp_buf, width*height*sizeof(uint16_t));
+    free(tmp_buf);
+}
+
+void blur_rgb565(camera_fb_t* fb) {
+    if(!fb || !fb->buf) return;
+
+    int width  = fb->width;
+    int height = fb->height;
+    uint16_t* img = (uint16_t*)fb->buf;
+
+    // Temporary buffer to store blurred result
+    uint16_t* tmp = (uint16_t*)malloc(width * height * sizeof(uint16_t));
+    if(!tmp) return;
+
+    for(int y=0; y<height; y++){
+        for(int x=0; x<width; x++){
+            int r_sum=0, g_sum=0, b_sum=0, count=0;
+
+            // 3x3 neighborhood
+            for(int dy=-1; dy<=1; dy++){
+                int ny = y + dy;
+                if(ny < 0 || ny >= height) continue;
+
+                for(int dx=-1; dx<=1; dx++){
+                    int nx = x + dx;
+                    if(nx < 0 || nx >= width) continue;
+
+                    uint16_t px = img[ny*width + nx];
+                    uint8_t r = ((px >> 11) & 0x1F) << 3;
+                    uint8_t g = ((px >> 5) & 0x3F) << 2;
+                    uint8_t b = (px & 0x1F) << 3;
+
+                    r_sum += r;
+                    g_sum += g;
+                    b_sum += b;
+                    count++;
+                }
+            }
+
+            // Average and convert back to RGB565
+            uint8_t r_avg = r_sum / count;
+            uint8_t g_avg = g_sum / count;
+            uint8_t b_avg = b_sum / count;
+            tmp[y*width + x] = ((r_avg>>3)<<11) | ((g_avg>>2)<<5) | (b_avg>>3);
+        }
+    }
+
+    // Copy back
+    memcpy(img, tmp, width*height*sizeof(uint16_t));
+    free(tmp);
 }
 
 camera_fb_t* cameraCapturePhoto(){
