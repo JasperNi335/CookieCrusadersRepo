@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+  <div class="grid cols-2">
+    <div class="card">
+      <h2 style="margin-top:0">Welcome</h2>
+      <p>Hello World</p>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/home.js') }}"></script>
+{% endblock %}

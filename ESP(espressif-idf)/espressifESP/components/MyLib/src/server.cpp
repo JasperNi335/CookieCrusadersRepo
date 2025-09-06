@@ -1,6 +1,4 @@
 #include "server.h"
-#include "detection.h"
-#include <math.h>
 
 static const char* TAG = "Server";
 
@@ -43,77 +41,76 @@ void setStreamConst(){
     snprintf(_STREAM_BOUNDARY, sizeof(_STREAM_BOUNDARY), "\r\n--%s\r\n", PART_BOUNDARY);
 }
 
-esp_err_t get_stream_handler(httpd_req_t* request) {
-    ESP_LOGI(TAG, "Client connected");
+esp_err_t get_stream_handler(httpd_req_t* req) {
+    ESP_LOGI(TAG, "GET /stream");
+    esp_err_t res = httpd_resp_set_type(req, _STREAM_CONTENT_TYPE);
+    if (res != ESP_OK) return res;
 
-    esp_err_t res = httpd_resp_set_type(request, _STREAM_CONTENT_TYPE);
-    if(res != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set content type: %s", esp_err_to_name(res));
-        return res;
-    }
-
-    // Buffers for JPEG encoding
-    uint8_t *jpg_buffer = NULL;
+    camera_fb_t* fb = NULL;
     size_t jpg_len = 0;
+    uint8_t* jpg_buf = NULL;
+    char header_buffer[MJPEG_HEADER_SIZE];   // FIXED: correct type
 
-    // Maximum faces we can handle
-    int x[MAX_FACES], y[MAX_FACES], w[MAX_FACES], h[MAX_FACES];
+    while (true) {
+        fb = esp_camera_fb_get();
+        if (!fb) { res = ESP_FAIL; break; }
 
-    while(true) {
-        camera_fb_t* fb = esp_camera_fb_get();
-        if(!fb || !fb->buf) {
-            ESP_LOGE(TAG, "Camera capture failed");
-            continue;
+        jpg_buf = NULL;        // reset for each loop
+        jpg_len = 0;
+
+        if (fb->format == PIXFORMAT_JPEG) {
+            // Use camera-owned JPEG buffer directly
+            jpg_buf = fb->buf;
+            jpg_len = fb->len;
+
+            // Send boundary + header + image while holding fb
+            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+            if (res == ESP_OK) {
+                size_t hlen = snprintf(header_buffer, sizeof(header_buffer), _STREAM_PART, jpg_len);
+                res = httpd_resp_send_chunk(req, header_buffer, hlen);
+            }
+            if (res == ESP_OK) {
+                res = httpd_resp_send_chunk(req, (const char*)jpg_buf, jpg_len);
+            }
+
+            esp_camera_fb_return(fb);  // return after send
+            fb = NULL;
+
+        } else {
+            // Convert to JPEG into our own malloc'd buffer
+            // quality 80 is a good start; adjust to reduce size if needed
+            bool ok = frame2jpg(fb, 80, &jpg_buf, &jpg_len);
+            esp_camera_fb_return(fb);  // return ASAP now that we have our own buffer
+            fb = NULL;
+
+            if (!ok || !jpg_buf) { res = ESP_FAIL; break; }
+
+            // Send boundary + header + image (we own jpg_buf)
+            res = httpd_resp_send_chunk(req, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
+            if (res == ESP_OK) {
+                size_t hlen = snprintf(header_buffer, sizeof(header_buffer), _STREAM_PART, jpg_len);
+                res = httpd_resp_send_chunk(req, header_buffer, hlen);
+            }
+            if (res == ESP_OK) {
+                res = httpd_resp_send_chunk(req, (const char*)jpg_buf, jpg_len);
+            }
+
+            free(jpg_buf);      // free only our malloc'd buffer
+            jpg_buf = NULL;
         }
 
-        
-        // --- Detect skin blobs ---
-        int num_faces = detect_faces(fb, x, y, w, h);
+        if (res != ESP_OK) break;
 
-        // --- Draw rectangles on the frame ---
-        draw_faces(fb, x, y, w, h, num_faces);
-
-        
-        // --- JPEG encode ---
-        if(!frame2jpg(fb, 80, &jpg_buffer, &jpg_len)) {
-            ESP_LOGE(TAG, "JPEG encoding failed");
-            esp_camera_fb_return(fb);
-            continue;
-        }
-
-        // --- Send MJPEG boundary ---
-        res = httpd_resp_send_chunk(request, _STREAM_BOUNDARY, strlen(_STREAM_BOUNDARY));
-        if(res != ESP_OK) {
-            free(jpg_buffer);
-            esp_camera_fb_return(fb);
-            break;
-        }
-
-        
-        // --- Send MJPEG part header ---
-        char header[128];
-        int header_len = snprintf(header, sizeof(header), _STREAM_PART, jpg_len);
-        res = httpd_resp_send_chunk(request, header, header_len);
-        if(res != ESP_OK) {
-            free(jpg_buffer);
-            esp_camera_fb_return(fb);
-            break;
-        }
-
-        // --- Send JPEG image ---
-        res = httpd_resp_send_chunk(request, (char*)jpg_buffer, jpg_len);
-        free(jpg_buffer);
-        if(res != ESP_OK) {
-            esp_camera_fb_return(fb);
-            break;
-        }
-
-        esp_camera_fb_return(fb);
+        // Gentle throttle to avoid FB-OVF on slow networks
+        vTaskDelay(pdMS_TO_TICKS(20));  // try 10–50 ms
     }
 
-    return ESP_OK;
-}
+    // If we bailed out mid-iteration, clean up
+    if (fb) esp_camera_fb_return(fb);
+    if (jpg_buf && (res != ESP_OK)) free(jpg_buf);
 
+    return res;
+}
 
 
 httpd_uri_t uri_get = {

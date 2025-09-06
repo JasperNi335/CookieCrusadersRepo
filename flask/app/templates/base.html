@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>{{ title or "ECSE Design Competition" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <header class="header">
+    <div class="nav-wrap">
+      <div class="brand"><a href="{{ url_for('web.home') }}">ECSE Design Competition</a></div>
+
+      <button class="menu-toggle" data-nav-toggle aria-expanded="false" aria-controls="primary-nav" aria-label="Menu">☰</button>
+
+      <nav id="primary-nav" class="nav" data-site-nav>
+        <a href="{{ url_for('web.home') }}" class="{{ 'active' if request.path=='/' else '' }}">Home</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/nav.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>
