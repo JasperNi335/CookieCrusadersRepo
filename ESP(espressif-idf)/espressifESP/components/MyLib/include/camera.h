@@ -21,14 +21,6 @@ void setCameraSettings();
 // use esp_camera_fb_return(fb)
 camera_fb_t* cameraCapturePhoto();
 
-// converts frame buffer pointer to base64
-// user needs to free the buffer
-char* fb_to_b64(camera_fb_t* frame_buffer);
-
-void kuwahara_filter(camera_fb_t* fb);
-
-void blur_rgb565(camera_fb_t* fb);
-
 /*-----------------------------------------
 Serial Camera methods
 -----------------------------------------*/
