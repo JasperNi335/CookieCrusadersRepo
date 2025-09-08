@@ -1,13 +1,14 @@
 #ifndef MFCC_H
 #define MFCC_H
-#include <stdint.h>
-#include <stddef.h>
+
 #include <stdbool.h>
 
-bool mfcc_init(int sample_rate, int fft_size, int frame_len, int num_mel, int num_mfcc);
+void mfcc_init(int sample_rate, int num_fbank, int num_coeffs);
 
-// Compute MFCCs for one frame (length = frame_len) of PCM16.
-// Writes NUM_MFCC floats into out_mfcc.
-void mfcc_compute_frame(const int16_t *pcm, float *out_mfcc);
+// Compute MFCCs for one frame of `N` samples (mono, float in [-1,1] ideally).
+// `mfcc_out` must have room for `num_coeffs`.
+// If `include_c0` is true, coefficient 0 (energy) is included as the first value.
+void mfcc_compute(const float* frame, int N, float* mfcc_out,
+                  int num_coeffs, bool include_c0);
 
 #endif // MFCC_H

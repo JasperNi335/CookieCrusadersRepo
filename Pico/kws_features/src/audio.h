@@ -1,13 +1,20 @@
 #ifndef AUDIO_H
 #define AUDIO_H
-#include <stdint.h>
+
 #include <stddef.h>
-#include <stdbool.h>
+#include <stdint.h>
 
-// Initialize ADC on MIC_GPIO and start 16 kHz timer sampler.
-bool audio_init(uint32_t sample_rate_hz);
+void   audio_init(void);                      // starts background ADC sampling
+void   audio_stop(void);
 
-// Blocking fetch of N fresh samples (PCM16 mono).
-size_t audio_get_samples(int16_t *dst, size_t n);
+// Copy the last N samples (oldest..newest) into dst.
+// If N > ring size, it will be clamped.
+void   audio_get_recent(int16_t *dst, size_t n);
+
+// Block until N new samples have arrived, then copy the last N into dst.
+size_t audio_read_block(int16_t *dst, size_t n);
+
+// Back-compat thin wrapper around audio_read_block()
+void   audio_get_frame(int16_t *dst, size_t n);
 
 #endif // AUDIO_H

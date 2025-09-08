@@ -1,0 +1,22 @@
+# Build output
+/build/
+/CMakeFiles/
+/CMakeCache.txt
+/cmake_install.cmake
+/compile_commands.json
+/.ninja_log
+/.ninja_deps
+/build.ninja
+/pico_flash_region.ld
+
+# Binary artifacts
+/*.elf
+/*.elf.map
+/*.bin
+/*.hex
+/*.uf2
+/*.dis
+
+# VS Code local stuff
+/.vscode/ipch/
+/.vscode/targets.log
