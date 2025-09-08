@@ -1,20 +1,43 @@
-# udp_rx.py
-import socket, struct
+import socket, struct, wave
+
+HOST = "0.0.0.0"
+PORT = 33333
+OUT  = "capture.wav"
+
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind(("0.0.0.0", 5555))
-print("listening on UDP :5555")
-while True:
-    data, addr = sock.recvfrom(4096)
-    if len(data) >= 4 and data[0]==0x5A and data[1]==0xA5:
-        typ = data[2]
-        if typ == 1:
-            seq = int.from_bytes(data[4:6], "little")
-            ns  = int.from_bytes(data[6:8], "little")
-            sr  = int.from_bytes(data[8:10], "little")
-            print(f"PCM seq={seq} ns={ns} sr={sr} bytes={len(data)} from {addr}")
-        elif typ == 2:
-            ts  = int.from_bytes(data[4:8], "little")
-            score = struct.unpack("<f", data[8:12])[0]
-            print(f"KWS event ts={ts} score={score} from {addr}")
-    else:
-        print(len(data), "bytes from", addr)
+sock.bind((HOST, PORT))
+sock.settimeout(5)
+
+wf = None
+expected_seq = None
+print(f"Listening on UDP {HOST}:{PORT}")
+
+try:
+    while True:
+        data, addr = sock.recvfrom(65536)
+        if len(data) < 10:  # seq(4)+sr(4)+n(2)
+            continue
+        seq, sr, n = struct.unpack_from("<IIH", data, 0)
+        pcm = data[10:]
+        if len(pcm) != n*2:
+            continue
+
+        if wf is None:
+            wf = wave.open(OUT, "wb")
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(sr)
+            print(f"Started WAV {OUT} at {sr} Hz from {addr}")
+
+        if expected_seq is not None and seq != expected_seq:
+            print(f"Packet gap/reorder: got {seq}, expected {expected_seq}")
+        expected_seq = seq + 1
+
+        wf.writeframesraw(pcm)
+
+except KeyboardInterrupt:
+    pass
+finally:
+    if wf: wf.close()
+    sock.close()
+    print("Done, wrote", OUT)

@@ -12,6 +12,8 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
+
+# You can keep pico_w or use pico; Wi-Fi isn’t linked here.
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 cmake_minimum_required(VERSION 3.13)
@@ -45,17 +47,14 @@ target_include_directories(kws_features PRIVATE
 pico_enable_stdio_usb(kws_features 1)
 pico_enable_stdio_uart(kws_features 0)
 
-# --- Libraries ---
+# --- Libraries (NO Wi-Fi needed) ---
 target_link_libraries(kws_features
     pico_stdlib
     hardware_adc
     hardware_dma
-    hardware_pio
     hardware_timer
-    hardware_spi
-    hardware_i2c
-    hardware_pwm
-    pico_multicore
+    hardware_uart
+    pico_util
 )
 
 # --- Generate .uf2/.bin/.elf ---

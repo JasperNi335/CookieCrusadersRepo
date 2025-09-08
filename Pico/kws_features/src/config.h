@@ -3,36 +3,22 @@
 
 // ===== Audio sampling =====
 #define SAMPLE_RATE_HZ      16000
-#define SAMPLES_PER_FRAME   400     // 25 ms @ 16 kHz
-#define SAMPLES_PER_HOP     160     // 10 ms hop
+#define SAMPLES_PER_PKT     1024    // 64 ms @ 16 kHz
 
 // ===== Microphone pin/ADC =====
-// LM386 module → connect OUT pin to Pico ADC0 (GPIO26)
-#define MIC_GPIO        26
+#define MIC_GPIO        26          // ADC0 on GPIO26
 #define MIC_ADC_INPUT   0
 
-// ===== Automatic Gain Control (AGC) =====
-#define AGC_TARGET_RMS      2000.0f   // target RMS level
-#define AGC_MAX_GAIN        50.0f     // clamp max gain
-#define AGC_ATTACK          0.05f     // how fast gain increases
-#define AGC_RELEASE         0.005f    // how fast gain decreases
+// ===== UART link to ESP =====
+#define UART_INST       uart0
+#define UART_BAUD       921600      // fast & reliable
+#define UART_TX_PIN     0           // Pico UART0 TX = GPIO0
+#define UART_RX_PIN     1           // Pico UART0 RX = GPIO1 (not used here but init anyway)
 
-// ===== Pre-emphasis =====
-#define PREEMPHASIS_ALPHA   0.97f
-
-// ===== Voice Activity Detection (VAD) =====
-#define VAD_ENERGY_START    6.0f    // dB above noise floor to trigger speech
-#define VAD_ENERGY_STOP     3.0f    // dB margin to drop speech
-#define VAD_MIN_FRAMES      3       // consecutive frames before speech=true
-#define VAD_MAX_FRAMES      50      // cap run length
-
-// ===== MFCC parameters =====
-#define MFCC_NUM_FBANKS     26
-#define MFCC_NUM_COEFFS     13
-#define MFCC_USE_ENERGY     1       // include log energy as coefficient 0
-
-// ===== Keyword spotting (KWS) =====
-#define KWS_THRESHOLD       0.85f   // cosine similarity threshold
-#define KWS_COOLDOWN_FRAMES 50      // cooldown after detection
+// ===== Framing (Pico -> ESP) =====
+// We add a small 6-byte framing header before each audio packet:
+// magic (0xAA55AA55, uint32), len (uint16) for the following payload bytes.
+// The payload starts with: seq(uint32), sample_rate(uint32), n(uint16), then PCM16[n].
+#define FRAMING_MAGIC   0xAA55AA55u
 
 #endif // CONFIG_H
