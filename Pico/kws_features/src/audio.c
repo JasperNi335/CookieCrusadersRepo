@@ -6,13 +6,12 @@
 #include "hardware/dma.h"
 #include "hardware/irq.h"
 #include "pico/util/queue.h"
-#include <string.h>
 
-#define ADC_GPIO     MIC_GPIO
-#define ADC_INPUT    MIC_ADC_INPUT
+#define ADC_GPIO   MIC_GPIO
+#define ADC_INPUT  MIC_ADC_INPUT
 
 typedef struct {
-    uint8_t  bytes[AUDIO_HEADER_BYTES + SAMPLES_PER_PKT * sizeof(int16_t)];
+    uint8_t bytes[AUDIO_HEADER_BYTES + SAMPLES_PER_PKT * sizeof(int16_t)];
 } packet_buf_t;
 
 static packet_buf_t pktA, pktB;
@@ -23,7 +22,7 @@ static uint32_t seq_counter = 0;
 static int dma_chan;
 static queue_t ready_q;
 
-// DC blocker for cheap mic modules
+// simple DC blocker to remove mid-rail bias if present
 static float dc_prev_in = 0.f, dc_prev_out = 0.f;
 static inline int16_t dc_block(int16_t x) {
     const float R = 0.995f; // ~16 Hz cutoff @ 16k
@@ -38,10 +37,10 @@ static inline int16_t dc_block(int16_t x) {
 
 static void fill_header(packet_buf_t* p, uint32_t seq) {
     uint32_t* p32 = (uint32_t*)p->bytes;
-    p32[0] = seq;                 // seq
-    p32[1] = SAMPLE_RATE_HZ;      // sample_rate
+    p32[0] = seq;
+    p32[1] = SAMPLE_RATE_HZ;
     uint16_t* p16 = (uint16_t*)&p->bytes[sizeof(uint32_t)*2];
-    p16[0] = (uint16_t)SAMPLES_PER_PKT; // n
+    p16[0] = (uint16_t)SAMPLES_PER_PKT;
 }
 
 static int16_t* payload_ptr(packet_buf_t* p) {
@@ -51,11 +50,11 @@ static int16_t* payload_ptr(packet_buf_t* p) {
 static void __isr dma_handler(void) {
     dma_hw->ints0 = 1u << dma_chan;
 
+    // convert raw 12-bit unsigned -> centered int16 and dc-block
     int16_t* s = payload_ptr(write_pkt);
-    // ADC FIFO is 12-bit unsigned in 16-bit. Center+scale, then DC-block.
     for (int i = 0; i < SAMPLES_PER_PKT; ++i) {
         uint16_t raw = (uint16_t)s[i];
-        int16_t x = ((int)raw - 2048) << 4;
+        int16_t x = ((int)raw - 2048) << 4; // 12->16 bit with centering
         s[i] = dc_block(x);
     }
 
@@ -81,6 +80,7 @@ void audio_init(void) {
     adc_gpio_init(ADC_GPIO);
     adc_select_input(ADC_INPUT);
 
+    // 48 MHz / div = SAMPLE_RATE_HZ
     float div = 48000000.0f / (float)SAMPLE_RATE_HZ;
     adc_set_clkdiv(div);
 
@@ -88,7 +88,7 @@ void audio_init(void) {
         true,   // enable FIFO
         true,   // DMA DREQ
         1,      // threshold
-        false,  // err bit
+        false,  // no error bit
         false   // keep 12-bit in 16-bit
     );
 

@@ -3,22 +3,18 @@
 
 // ===== Audio sampling =====
 #define SAMPLE_RATE_HZ      16000
-#define SAMPLES_PER_PKT     1024    // 64 ms @ 16 kHz
+#define SAMPLES_PER_PKT     1024    // ~64 ms @ 16 kHz
 
-// ===== Microphone pin/ADC =====
-#define MIC_GPIO        26          // ADC0 on GPIO26
+// ===== Microphone (XC4438 analog A0) -> ADC0 on GPIO26 (physical pin 31) =====
+#define MIC_GPIO        26
 #define MIC_ADC_INPUT   0
 
-// ===== UART link to ESP =====
-#define UART_INST       uart0
-#define UART_BAUD       921600      // fast & reliable
-#define UART_TX_PIN     0           // Pico UART0 TX = GPIO0
-#define UART_RX_PIN     1           // Pico UART0 RX = GPIO1 (not used here but init anyway)
+// ===== PWM speaker/amp output on GPIO27 (physical pin 32) =====
+#define SPEAKER_PIN     27
 
-// ===== Framing (Pico -> ESP) =====
-// We add a small 6-byte framing header before each audio packet:
-// magic (0xAA55AA55, uint32), len (uint16) for the following payload bytes.
-// The payload starts with: seq(uint32), sample_rate(uint32), n(uint16), then PCM16[n].
-#define FRAMING_MAGIC   0xAA55AA55u
+// ===== Detection tuning =====
+#define VOICE_THRESH_DBFS   (-30.0f)  // raise toward -25 if too sensitive
+#define BEEP_MS             (400)     // beep length
+#define COOLDOWN_MS         (800)     // min gap between beeps
 
 #endif // CONFIG_H

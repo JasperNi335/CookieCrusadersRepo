@@ -13,48 +13,42 @@ if (EXISTS ${picoVscode})
 endif()
 # ====================================================================================
 
-# You can keep pico_w or use pico; Wi-Fi isn’t linked here.
+# Plain Pico board (no Wi-Fi needed for this test)
 set(PICO_BOARD pico CACHE STRING "Board type")
 
 cmake_minimum_required(VERSION 3.13)
 
-# --- Point to your Pico SDK ---
+# Pico SDK path (adjust if needed)
 if(NOT DEFINED PICO_SDK_PATH)
   set(PICO_SDK_PATH "C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0")
 endif()
 
-# Pull in the Pico SDK
 include(pico_sdk_import.cmake)
 
 project(kws_features C CXX ASM)
-
-# Initialize the SDK
 pico_sdk_init()
 
-# --- Sources ---
 add_executable(kws_features
     src/main.c
     src/audio.c
 )
 
-# --- Include directories ---
 target_include_directories(kws_features PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
 )
 
-# --- I/O ---
+# USB stdio on; UART stdio off
 pico_enable_stdio_usb(kws_features 1)
 pico_enable_stdio_uart(kws_features 0)
 
-# --- Libraries (NO Wi-Fi needed) ---
+# Link the hardware we use
 target_link_libraries(kws_features
     pico_stdlib
     hardware_adc
     hardware_dma
     hardware_timer
-    hardware_uart
+    hardware_pwm
     pico_util
 )
 
-# --- Generate .uf2/.bin/.elf ---
 pico_add_extra_outputs(kws_features)
