@@ -12,34 +12,51 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
+set(PICO_BOARD pico CACHE STRING "Board type")
+
 cmake_minimum_required(VERSION 3.13)
 
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# --- Point to your Pico SDK ---
+if(NOT DEFINED PICO_SDK_PATH)
+  set(PICO_SDK_PATH "C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0")
+endif()
 
-# Make sure we really build for Pico W even if cache existed before
-set(PICO_BOARD pico_w CACHE STRING "Board type" FORCE)
-
+# Pull in the Pico SDK
 include(pico_sdk_import.cmake)
+
 project(kws_features C CXX ASM)
+
+# Initialize the SDK
 pico_sdk_init()
 
+# --- Sources ---
 add_executable(kws_features
     src/main.c
     src/audio.c
     src/mfcc.c
 )
 
-# Link the right bits for Pico W LED control
-target_link_libraries(kws_features
-    pico_stdlib
-    hardware_adc
-    pico_cyw43_arch_none
+# --- Include directories ---
+target_include_directories(kws_features PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/src
 )
 
-# USB prints ON, UART prints OFF
+# --- I/O ---
 pico_enable_stdio_usb(kws_features 1)
 pico_enable_stdio_uart(kws_features 0)
 
+# --- Libraries ---
+target_link_libraries(kws_features
+    pico_stdlib
+    hardware_adc
+    hardware_dma
+    hardware_pio
+    hardware_timer
+    hardware_spi
+    hardware_i2c
+    hardware_pwm
+    pico_multicore
+)
+
+# --- Generate .uf2/.bin/.elf ---
 pico_add_extra_outputs(kws_features)
