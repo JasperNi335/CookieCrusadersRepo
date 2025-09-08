@@ -35,7 +35,6 @@ pico_sdk_init()
 add_executable(kws_features
     src/main.c
     src/audio.c
-    src/mfcc.c
 )
 
 # --- Include directories ---
