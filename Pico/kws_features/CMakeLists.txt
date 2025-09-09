@@ -13,12 +13,9 @@ if (EXISTS ${picoVscode})
 endif()
 # ====================================================================================
 
-# Plain Pico board (no Wi-Fi needed for this test)
 set(PICO_BOARD pico CACHE STRING "Board type")
-
 cmake_minimum_required(VERSION 3.13)
 
-# Pico SDK path (adjust if needed)
 if(NOT DEFINED PICO_SDK_PATH)
   set(PICO_SDK_PATH "C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0")
 endif()
@@ -37,11 +34,9 @@ target_include_directories(kws_features PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/src
 )
 
-# USB stdio on; UART stdio off
 pico_enable_stdio_usb(kws_features 1)
 pico_enable_stdio_uart(kws_features 0)
 
-# Link the hardware we use
 target_link_libraries(kws_features
     pico_stdlib
     hardware_adc

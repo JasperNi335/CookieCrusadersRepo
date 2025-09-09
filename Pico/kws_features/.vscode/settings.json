@@ -1,19 +1,16 @@
 {
+  "cmake.configureOnOpen": false,
+  "cmake.buildOnOpen": false,
+  "cmake.generator": "Ninja",
   "cmake.sourceDirectory": "${workspaceFolder}",
   "cmake.buildDirectory": "${workspaceFolder}/build_ninja",
-  "cmake.generator": "Ninja",
-
-  "cmake.configureOnOpen": true,
-  "cmake.buildOnOpen": true,
   "cmake.buildTarget": "kws_features.uf2",
-
-  "workbench.colorTheme": "Quiet Light",
-  "files.autoSave": "afterDelay",
-
-  "raspberry-pi-pico.python3Path": "c:\\Program Files\\Python313\\python.exe",
-
-  "workbench.editorAssociations": [
-    { "viewType": "vscode.markdown.preview.editor", "filenamePattern": "*.copilotmd" },
-    { "viewType": "default", "filenamePattern": "*.uf2" }
-  ]
+  "cmake.configureSettings": {
+    "CMAKE_BUILD_TYPE": "Debug",
+    "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+    "Python3_EXECUTABLE": "c:/Program Files/Python313/python.exe",
+    "CMAKE_C_COMPILER": "C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gcc.exe",
+    "CMAKE_CXX_COMPILER": "C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-g++.exe",
+    "PICO_SDK_PATH": "C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0"
+  }
 }

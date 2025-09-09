@@ -30,6 +30,52 @@
       ],
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
+    },
+    {
+      "label": "Flash (UF2 to RPI-RP2)",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File",
+        "${workspaceFolder}/.vscode/flash.ps1"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "On Open: Configure → Build → Flash",
+      "dependsOn": [
+        "Configure (manual)",
+        "Build (manual)",
+        "Flash (UF2 to RPI-RP2)"
+      ],
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build+Flash",
+      "dependsOn": [
+        "Build (manual)",
+        "Flash (UF2 to RPI-RP2)"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean+Reconfigure",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-Command",
+        "Remove-Item -Recurse -Force '${workspaceFolder}/build_ninja' -ErrorAction SilentlyContinue; & 'C:\\Program Files\\CMake\\bin\\cmake.exe' -G Ninja -S '${workspaceFolder}' -B '${workspaceFolder}/build_ninja' -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DPython3_EXECUTABLE='c:/Program Files/Python313/python.exe' -DCMAKE_C_COMPILER='C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gcc.exe' -DCMAKE_CXX_COMPILER='C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-g++.exe' -DPICO_SDK_PATH='C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0'"
+      ],
+      "problemMatcher": []
     }
   ]
 }
