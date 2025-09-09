@@ -5,47 +5,63 @@
       "label": "Bootstrap dev env",
       "type": "shell",
       "command": "python",
-      "args": ["tools/bootstrap.py"]
+      "args": ["tools/bootstrap.py"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Firmware: Flash MicroPython UF2",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}\\tools\\flash_uf2.ps1",
+        "-Py", "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+      ],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
     },
     {
       "label": "Device: Sync to Pico",
       "type": "shell",
-      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "command": "powershell",
       "args": [
-        "-m", "mpremote", "cp",
-        "device/boot.py", ":boot.py",
-        "device/config.py", ":config.py",
-        "device/audio.py", ":audio.py",
-        "device/main.py", ":main.py",
-        "reset"
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}\\tools\\sync_to_pico.ps1",
+        "-Py", "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+        // To force a specific COM port, add: , "-Port", "COM6"
       ],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Device: REPL (mpremote)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "mpremote", "repl"],
       "problemMatcher": []
     },
     {
       "label": "Host: List COM ports",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools/list_ports.py"]
+      "args": ["tools\\list_ports.py"],
+      "problemMatcher": []
     },
     {
-      "label": "Host: Send BEEP (prompt COM)",
+      "label": "Host: Send BEEP (auto-port)",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools/kws_cookie_over_serial.py", "--port", "${input:comPort}", "--beep"]
+      "args": ["tools\\kws_cookie_over_serial.py", "--beep"],
+      "problemMatcher": []
     },
     {
-      "label": "Host: Read 1 frame (prompt COM)",
+      "label": "Host: Read 1 frame (auto-port)",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools/kws_cookie_over_serial.py", "--port", "${input:comPort}", "--frames", "1"]
-    }
-  ],
-  "inputs": [
-    {
-      "id": "comPort",
-      "type": "promptString",
-      "description": "Enter the DATA CDC COM port (e.g., COM7)",
-      "default": "COM7"
+      "args": ["tools\\kws_cookie_over_serial.py", "--frames", "1"],
+      "problemMatcher": []
     }
   ]
 }

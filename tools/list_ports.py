@@ -1,6 +1,7 @@
-import sys
+# Lists serial ports (helps pick the Pico)
 import serial.tools.list_ports as lp
 
 for p in lp.comports():
-    print(f"{p.device:>6}  {p.vid:04X}:{p.pid:04X}  {p.manufacturer or ''}  {p.description}")
-print("\nPick the *data* CDC port (the other one is the REPL).")
+    vid = f"{p.vid:04X}" if p.vid is not None else "----"
+    pid = f"{p.pid:04X}" if p.pid is not None else "----"
+    print(f"{p.device:>6}  {vid}:{pid}  {p.manufacturer or ''}  {p.description or ''}")

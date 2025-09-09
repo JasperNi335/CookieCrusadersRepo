@@ -1,21 +1,25 @@
-# config.py
+# Stream + audio settings used by main.py and audio.py
 
-# ---------- Pins ----------
-LED_PIN_NAME = "LED"   # Pico onboard LED alias
-AUDIO_ADC_PIN = 26     # GP26/ADC0; change if your mic is on another ADC
-SPEAKER_PIN   = 18     # PWM-capable pin wired to your speaker/buzzer
+# Serial framing (must match host)
+FRAMING_MAGIC = 0xA1B2C3D4
 
-# ---------- Audio ----------
-SAMPLE_RATE_HZ   = 8000      # keep modest in MicroPython; 8 kHz is realistic
-PACKET_SAMPLES   = 256       # 256 samples -> 512-byte payload
-QUEUE_MAX_PACKETS = 12       # backpressure limit
+# Enable binary frame streaming over the same CDC port
+ENABLE_USB_STREAM = True
 
-# ---------- Protocol ----------
-# 6-byte header: [u32 magic][u16 payload_len]
-# Set to the SAME value your host reader expects.
-FRAMING_MAGIC = 0xA1B2C3D4   # <— CHANGE if your PC tool expects a different magic
+# Audio & DSP
+AUDIO_ADC_PIN = 26        # GP26 = ADC0
+SAMPLE_RATE_HZ = 8000     # 8 kHz
+PACKET_SAMPLES = 256      # samples per packet
+QUEUE_MAX_PACKETS = 8
 
-# ---------- Commands ----------
-BEEP_TONE_MS  = 120
-BEEP_GAP_MS   = 60
-COOLDOWN_MS   = 1200
+# Simple sound detection
+ENV_CENTER = 32768        # mid of 16-bit ADC
+ENV_THRESH = 1500         # tweak for your mic; start here
+ENV_HANG_MS = 600         # cooldown before another beep
+
+# LED / Speaker
+LED_PIN = "LED"           # works on Pico & Pico W
+SPEAKER_PIN = 18          # PWM-capable pin wired to speaker/amp
+BEEP_TONE_HZ = 2000
+BEEP_MS = 120
+BEEP_GAP_MS = 60

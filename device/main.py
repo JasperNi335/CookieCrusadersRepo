@@ -1,130 +1,144 @@
-# main.py
-import sys, time, struct, random
+from typing import Optional, Any, BinaryIO, cast
+import sys
+import struct
+import utime                    # MicroPython time module (has sleep_ms, ticks_*)
 from machine import Pin, PWM
+
+from config import (
+    FRAMING_MAGIC, ENABLE_USB_STREAM,
+    LED_PIN, SPEAKER_PIN,
+    BEEP_TONE_HZ, BEEP_MS, BEEP_GAP_MS,
+    ENV_CENTER, ENV_THRESH, ENV_HANG_MS,
+)
 import audio
-import config
 
-# ----- LED -----
-led = Pin(config.LED_PIN_NAME, Pin.OUT)
 
-# ----- Speaker via PWM -----
-spk_pwm = PWM(Pin(config.SPEAKER_PIN))
-spk_pwm.duty_u16(0)
+# ---------- PWM tone helpers ----------
+def pwm_tone_start(pin_num: int, freq_hz: int) -> PWM:
+    pwm = PWM(Pin(pin_num))
+    pwm.freq(int(freq_hz))
+    pwm.duty_u16(32768)  # ~50%
+    return pwm
 
-def pwm_tone_start(freq_hz: int):
-    if freq_hz <= 0:
-        spk_pwm.duty_u16(0)
-        return
-    spk_pwm.freq(int(freq_hz))
-    spk_pwm.duty_u16(32768)  # ~50%
 
-def pwm_tone_stop():
-    spk_pwm.duty_u16(0)
+def pwm_tone_stop(pwm: PWM) -> None:
+    pwm.deinit()
 
-def play_melody():
-    # 3 tones, choose one of 4 patterns
-    patterns = [
-        (1000, 2000, 3000),
-        (1500, 1000, 2500),
-        (2000, 1200, 3000),
-        (3000, 2000, 1000),
-    ]
-    pat = random.choice(patterns)
-    for i, f in enumerate(pat):
-        pwm_tone_start(f)
-        time.sleep_ms(config.BEEP_TONE_MS)
-        pwm_tone_stop()
-        if i != len(pat) - 1:
-            time.sleep_ms(config.BEEP_GAP_MS)
 
-# ----- USB data channel (separate from REPL if boot.py enabled it) -----
-usb_out = None
-usb_in  = None
-try:
-    import usb_cdc
-    usb_out = usb_cdc.data  # binary stream out/in
-    usb_in  = usb_cdc.data
-except Exception:
-    # Fallback: use sys.stdout/sys.stdin (will share with REPL; not ideal)
-    usb_out = sys.stdout.buffer
-    usb_in  = sys.stdin.buffer
+def play_melody(pin_num: int) -> None:
+    seq = (BEEP_TONE_HZ, int(BEEP_TONE_HZ * 1.5), BEEP_TONE_HZ)
+    for idx, f in enumerate(seq):
+        p = pwm_tone_start(pin_num, f)
+        utime.sleep_ms(BEEP_MS)
+        pwm_tone_stop(p)
+        if idx != len(seq) - 1:
+            utime.sleep_ms(BEEP_GAP_MS)
 
-def usb_write_all(b: bytes):
-    # write in chunks to avoid large-buffer hiccups
-    mv = memoryview(b)
-    total = 0
-    while total < len(b):
-        n = usb_out.write(mv[total:total+1024])
-        if n is None:
-            n = 0
-        total += n
 
-def read_line_nonblocking(maxlen=32):
-    """Read ASCII line (without blocking) from usb_in; returns str or None."""
-    if not hasattr(usb_in, "in_waiting"):
-        # simple fallback: non-portable; try a small timeout
-        return None
-    if usb_in.in_waiting <= 0:
-        return None
-    # Read available and look for '\n'
-    data = bytearray()
-    deadline = time.ticks_add(time.ticks_ms(), 2)
-    while time.ticks_diff(deadline, time.ticks_ms()) > 0 and len(data) < maxlen:
-        if usb_in.in_waiting > 0:
-            ch = usb_in.read(1)
-            if not ch:
-                break
-            if ch == b'\r':
-                continue
-            if ch == b'\n':
-                break
-            data += ch
-        else:
-            time.sleep_ms(1)
-    if not data:
-        return None
+# ---------- USB binary write (Pylance-safe) ----------
+def _stdout_binary() -> Optional[BinaryIO]:
+    # getattr(...) is typed as object|None; cast it to BinaryIO|None for Pylance.
+    buf: Any = getattr(sys.stdout, "buffer", None)
+    return cast(Optional[BinaryIO], buf)
+
+def usb_write_all(b: bytes) -> None:
+    bio = _stdout_binary()
+    if bio is not None:
+        bio.write(b)        # bytes -> binary stream
+        bio.flush()
+    else:
+        # Fallback for text-only stdout
+        sys.stdout.write(b.decode("latin-1"))
+        sys.stdout.flush()
+
+
+# ---------- Non-blocking line read (ASCII) ----------
+def read_cmd_nonblock() -> Optional[str]:
     try:
-        return data.decode('ascii', 'ignore')
-    except:
-        return None
+        import uselect as select  # MicroPython
+    except ImportError:
+        try:
+            import select         # CPython fallback (rarely used here)
+        except ImportError:
+            return None
 
-def main():
-    # Start audio sampler
+    res: Any = select.select([sys.stdin], [], [], 0)
+    # Some stubs mark select() as possibly returning None; guard to appease Pyright.
+    if not res:
+        return None
+    r, _, _ = res  # type: ignore[assignment]
+    if r:
+        try:
+            line = sys.stdin.readline()
+            if not line:
+                return None
+            return line.strip()
+        except Exception:
+            return None
+    return None
+
+
+# ---------- Simple envelope detector ----------
+def envelope_u16_le(payload: bytes) -> int:
+    """
+    payload: little-endian u16 PCM (0..65535).
+    Return mean absolute deviation around ENV_CENTER.
+    """
+    n = len(payload) // 2
+    if n == 0:
+        return 0
+    acc = 0
+    mv = memoryview(payload)
+    for i in range(0, len(mv), 2):
+        s = mv[i] | (mv[i + 1] << 8)
+        acc += abs(s - ENV_CENTER)
+    return acc // n
+
+
+def main() -> None:
+    led = Pin(LED_PIN, Pin.OUT)
+    led.value(0)
+
     audio.start()
 
-    next_allowed_ms = 0
-    hb_next = time.ticks_add(time.ticks_ms(), 500)
+    next_ok_ms = 0  # cooldown end time (ms)
+    hb_next = utime.ticks_add(utime.ticks_ms(), 500)
 
     while True:
-        # 1) STREAM AUDIO PACKETS (binary) with header [u32 magic][u16 len]
-        pay = audio.try_acquire_packet()
-        if pay:
-            hdr = struct.pack("<IH", config.FRAMING_MAGIC, len(pay))
-            usb_write_all(hdr)
-            usb_write_all(pay)
+        # 1) Host command?
+        cmd = read_cmd_nonblock()
+        if cmd == "BEEP":
+            now = utime.ticks_ms()
+            if utime.ticks_diff(now, next_ok_ms) >= 0:
+                play_melody(SPEAKER_PIN)
+                next_ok_ms = utime.ticks_add(now, ENV_HANG_MS)
 
-        # 2) COMMANDS: ASCII "BEEP\n" over the data USB CDC
-        line = read_line_nonblocking()
-        if line:
-            if line.strip().upper() == "BEEP":
-                now = time.ticks_ms()
-                if time.ticks_diff(now, next_allowed_ms) >= 0:
-                    play_melody()
-                    next_allowed_ms = time.ticks_add(now, config.COOLDOWN_MS)
+        # 2) Audio packet: stream (optional) + detect
+        pkt = audio.try_acquire_packet()
+        if pkt is not None:
+            if ENABLE_USB_STREAM:
+                hdr = struct.pack("<IH", FRAMING_MAGIC, len(pkt))
+                usb_write_all(hdr)
+                usb_write_all(pkt)
 
-        # 3) LED heartbeat (slow blink)
-        if time.ticks_diff(time.ticks_ms(), hb_next) >= 0:
+            env = envelope_u16_le(pkt)
+            if env >= ENV_THRESH:
+                now = utime.ticks_ms()
+                if utime.ticks_diff(now, next_ok_ms) >= 0:
+                    play_melody(SPEAKER_PIN)
+                    next_ok_ms = utime.ticks_add(now, ENV_HANG_MS)
+
+        # 3) Heartbeat LED (2 Hz)
+        now = utime.ticks_ms()
+        if utime.ticks_diff(now, hb_next) >= 0:
             led.toggle()
-            hb_next = time.ticks_add(time.ticks_ms(), 500)
+            hb_next = utime.ticks_add(now, 500)
 
-        # 4) cooperative yield
-        time.sleep_ms(1)
+        utime.sleep_ms(1)
+
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
         pass
-    finally:
-        pwm_tone_stop()
-        audio.stop()
