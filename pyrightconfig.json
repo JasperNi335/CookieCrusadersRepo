@@ -1,0 +1,6 @@
+{
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "warning",
+    "reportMissingModuleSource": "none",
+    "exclude": ["**/build", ".venv"]
+}  

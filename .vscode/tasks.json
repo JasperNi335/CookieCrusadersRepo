@@ -1,0 +1,51 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Bootstrap dev env",
+      "type": "shell",
+      "command": "python",
+      "args": ["tools/bootstrap.py"]
+    },
+    {
+      "label": "Device: Sync to Pico",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": [
+        "-m", "mpremote", "cp",
+        "device/boot.py", ":boot.py",
+        "device/config.py", ":config.py",
+        "device/audio.py", ":audio.py",
+        "device/main.py", ":main.py",
+        "reset"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Host: List COM ports",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["tools/list_ports.py"]
+    },
+    {
+      "label": "Host: Send BEEP (prompt COM)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["tools/kws_cookie_over_serial.py", "--port", "${input:comPort}", "--beep"]
+    },
+    {
+      "label": "Host: Read 1 frame (prompt COM)",
+      "type": "shell",
+      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+      "args": ["tools/kws_cookie_over_serial.py", "--port", "${input:comPort}", "--frames", "1"]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "comPort",
+      "type": "promptString",
+      "description": "Enter the DATA CDC COM port (e.g., COM7)",
+      "default": "COM7"
+    }
+  ]
+}

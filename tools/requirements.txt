@@ -1,0 +1,4 @@
+pyserial>=3.5
+mpremote>=1.22
+micropython-stdlib-stubs
+micropython-rp2-pico-stubs
