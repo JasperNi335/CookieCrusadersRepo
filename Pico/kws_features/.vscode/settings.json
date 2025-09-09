@@ -3,14 +3,13 @@
   "cmake.buildOnOpen": false,
   "cmake.generator": "Ninja",
   "cmake.sourceDirectory": "${workspaceFolder}",
-  "cmake.buildDirectory": "${workspaceFolder}/build_ninja",
+  "cmake.buildDirectory": "${workspaceFolder}/build",
   "cmake.buildTarget": "kws_features.uf2",
   "cmake.configureSettings": {
     "CMAKE_BUILD_TYPE": "Debug",
     "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-    "Python3_EXECUTABLE": "c:/Program Files/Python313/python.exe",
-    "CMAKE_C_COMPILER": "C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-gcc.exe",
-    "CMAKE_CXX_COMPILER": "C:/Users/Johnny Vu/.pico-sdk/toolchain/14_2_Rel1/bin/arm-none-eabi-g++.exe",
-    "PICO_SDK_PATH": "C:/Users/Johnny Vu/.pico-sdk/sdk/2.2.0"
-  }
+    "PICO_SDK_PATH": "${env:PICO_SDK_PATH}",
+    "PICO_TOOLCHAIN_PATH": "${env:ARM_GCC_PATH}"
+  },
+  "cmake.useCMakePresets": "never"
 }
