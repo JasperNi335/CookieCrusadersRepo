@@ -1,7 +1,7 @@
 ################################################################
 # Made by: MrDanS_21 and ChatGPT                               #
 #                                                              #
-# use DNN facial detection for best accuracy                   #
+# using DNN facial detection for best accuracy                 #
 # model dependancies:                                          #
 #   ../models/deploy.prototxt                                  #
 #   ../models/res10_300x300_ssd_iter_140000.caffemodel         #
@@ -10,25 +10,10 @@
 
 from __future__ import annotations
 import io, os, time
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Optional, Iterable
 import numpy as np
 import cv2
 
-# -------------------------
-# Haar (kept for comparison)
-# -------------------------
-_HAAR = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-
-def detect_faces_haar(img_bgr: np.ndarray) -> List[Tuple[int,int,int,int]]:
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-    gray = cv2.equalizeHist(gray)               # helps low-contrast 480p
-    gray = cv2.GaussianBlur(gray, (3,3), 0)     # denoise a touch
-    faces = _HAAR.detectMultiScale(gray, scaleFactor=1.06, minNeighbors=3, minSize=(30,30))
-    return [(int(x), int(y), int(w), int(h)) for (x,y,w,h) in faces]
-
-# -------------------------
-# DNN (SSD ResNet-10)
-# -------------------------
 _DNN = None
 def _load_dnn():
     global _DNN
@@ -42,10 +27,11 @@ def _load_dnn():
         _DNN.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
     return _DNN
 
-def detect_faces_dnn(
-    img_bgr: np.ndarray,
+def detect_faces(
+    img_source: Union[bytes, io.BytesIO, np.ndarray, str],
     conf_threshold: float = 0.4
 ) -> List[Tuple[int,int,int,int]]:
+    img_bgr = _to_bgr_image(img_source)
     net = _load_dnn()
     (h, w) = img_bgr.shape[:2]
     blob = cv2.dnn.blobFromImage(img_bgr, 1.0, (300, 300), (104.0, 177.0, 123.0))
@@ -63,7 +49,6 @@ def detect_faces_dnn(
             boxes.append((x, y, x2 - x, y2 - y))
     return boxes
 
-# --------------- utilities ---------------
 def _to_bgr_image(img_source: Union[bytes, io.BytesIO, np.ndarray, str]) -> np.ndarray:
     if isinstance(img_source, np.ndarray):
         # Assume input is BGR already; if you pass RGB (e.g., from PIL), convert before calling.
@@ -82,12 +67,6 @@ def _to_bgr_image(img_source: Union[bytes, io.BytesIO, np.ndarray, str]) -> np.n
         return img
     raise TypeError("Unsupported image source type.")
 
-def detect_faces(img_source, method: str = "dnn") -> List[Tuple[int,int,int,int]]:
-    img_bgr = _to_bgr_image(img_source)
-    if method == "haar":
-        return detect_faces_haar(img_bgr)
-    return detect_faces_dnn(img_bgr)
-
 def draw_boxes(img_source, boxes: List[Tuple[int,int,int,int]], thickness: int = 2) -> bytes:
     img_bgr = _to_bgr_image(img_source).copy()
     for (x, y, w, h) in boxes:
@@ -96,3 +75,75 @@ def draw_boxes(img_source, boxes: List[Tuple[int,int,int,int]], thickness: int =
     if not ok:
         raise RuntimeError("Failed to encode annotated image.")
     return buf.tobytes()
+
+def _box_area(box: Tuple[int,int,int,int]) -> int:
+    """Return area of (x, y, w, h)."""
+    x, y, w, h = box
+    # Guard negatives just in case
+    return max(0, w) * max(0, h)
+
+def closest_box(boxes: Iterable[Tuple[int,int,int,int]]) -> Optional[Tuple[int,int,int,int]]:
+    """
+    Heuristic: the 'closest person' is the detection with the LARGEST bounding box area.
+    Ties are broken by taller height, then by left-most x.
+    Returns None if no boxes.
+    """
+    boxes = list(boxes)
+    if not boxes:
+        return None
+    # max by (area, height, -x) so bigger area wins, then taller, then lower x (i.e., more left) if still tied
+    return max(boxes, key=lambda b: (_box_area(b), b[3], -b[0]))
+
+def box_center(box: Tuple[int,int,int,int]) -> Tuple[int,int]:
+    """Return integer pixel coords (cx, cy) for the center of the box."""
+    x, y, w, h = box
+    cx = x + w // 2
+    cy = y + h // 2
+    return (cx, cy)
+
+def box_region(box: Tuple[int,int,int,int], image_width: int) -> str:
+    """
+    Return 'L', 'M', or 'R' depending on which horizontal zone the BOX CENTER falls into.
+    Zones:
+      - 'L': left 2/5 of the image
+      - 'M': middle 1/5 of the image
+      - 'R': right 2/5 of the image
+    """
+    cx, _ = box_center(box)
+    left_cut = 0.4 * image_width
+    right_cut = 0.6 * image_width
+
+    if cx < left_cut:
+        return 'L'
+    elif cx < right_cut:
+        return 'M'
+    else:
+        return 'R'
+
+def classify_closest_person(
+    img_source: Union[bytes, io.BytesIO, np.ndarray, str],
+    conf_threshold: float = 0.4
+) -> Tuple[bytes, str]:
+    """
+    Detect faces, pick the 'closest' (largest box), classify its position into
+    'L'/'M'/'R' by horizontal thirds, and return an annotated image too.
+
+    Returns:
+        (annotated_png_bytes, side)
+        - annotated_png_bytes: PNG bytes with boxes drawn
+        - side: 'L' | 'M' | 'R' (defaults to 'M' if no faces)
+    """
+    # Decode and detect
+    img_bgr = _to_bgr_image(img_source)
+    h, w = img_bgr.shape[:2]
+    boxes = detect_faces(img_bgr, conf_threshold=conf_threshold)
+
+    # Decide side: default 'M' if none
+    side = 'M'
+    if boxes:
+        cb = closest_box(boxes)
+        side = box_region(cb, w)
+
+    # Always produce annotated image
+    annotated = draw_boxes(img_bgr, boxes)
+    return annotated, side

@@ -5,8 +5,8 @@
 from flask import Blueprint, request, jsonify
 from werkzeug.exceptions import BadRequest
 from ..services.ingest import append_chunk
-from ..services.facial_detection import detect_faces, draw_boxes
-import time
+from ..services.facial_detection import classify_closest_person
+import os, time
 
 bp = Blueprint("api", __name__)
 
@@ -37,13 +37,12 @@ def ingest():
     start = time.time()
     
     image = status["image_bytes"]
-    boxes = detect_faces(image)
-    annotated = draw_boxes(image, boxes)
+    annotated, side = classify_closest_person(image)
     
     end = time.time()
     print(f"Facial recognition ran in {(end - start)*1000:.6f} ms")
     
-    with open("Test/output.jpg", "wb") as f:
+    with open(os.path.join(os.path.dirname(__file__), "..", "static", "tmp", "output.jpg"), "wb") as f:
         f.write(annotated)
     
-    return '', 501
+    return side, 200
