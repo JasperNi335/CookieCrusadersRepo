@@ -30,32 +30,20 @@ def convert_to_mono_16k_pcm(input_file, output_file="converted.wav"):
     print(f"Converted file saved as {output_file}")
     return output_file
 
-# ------------------------
-# Step 1: Model setup
-# ------------------------
-MODEL_NAME = "vosk-model-en-us-0.22"
-MODEL_URL = f"https://alphacephei.com/vosk/models/{MODEL_NAME}.zip"
 
-if not os.path.exists(MODEL_NAME):
-    print(f"Model '{MODEL_NAME}' not found. Downloading...")
-    zip_path = MODEL_NAME + ".zip"
-    urllib.request.urlretrieve(MODEL_URL, zip_path)
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(".")
-    os.remove(zip_path)
-    print("Model downloaded and extracted.")
+def process_audio_file(FILE_NAME):
+    """ 
+    Process a single audio file for speech recognition 
+    
+    This function expects the audio file to be in the "testing_audio" directory
+    and to be named as {FILE_NAME}.wav. That might need to be changed if necessary
 
-# ------------------------
-# Step 2: Load model
-# ------------------------
-model = vosk.Model(MODEL_NAME)
-recognizer = vosk.KaldiRecognizer(model, 16000)  # 16000 Hz sample rate
+    The input .wav file should be mono, 16-bit PCM, 16kHz. If not, the function will
+    attempt to convert it using the `convert_to_mono_16k_pcm` function, which requires
+    more processing time, plus the `soundfile` and `scipy` libraries.
 
-# ------------------------
-# Step 3: Open test WAV file
-# ------------------------
-FILE_NAMES = ["hello", "long_recording", "test_1s", "test_17s", "where_cookies_go", "oh_boy", "gasp_cookie"]
-for FILE_NAME in FILE_NAMES:
+    This function will work with files of any length.
+    """
     audio_file = os.path.join(os.path.dirname(__file__), "testing_audio", f"{FILE_NAME}.wav")
     final_text = []
 
@@ -100,3 +88,35 @@ for FILE_NAME in FILE_NAMES:
 
     print("\nComplete Transcription:")
     print(" ".join(final_text))
+
+# ------------------------
+# Step 1: Model setup
+# ------------------------
+MODEL_NAME = "vosk-model-en-us-0.22" # This is an accurate but very heavy model.
+MODEL_URL = f"https://alphacephei.com/vosk/models/{MODEL_NAME}.zip"
+
+# Download model if not present
+if not os.path.exists(MODEL_NAME):
+    print(f"Model '{MODEL_NAME}' not found. Downloading...")
+    zip_path = MODEL_NAME + ".zip"
+    urllib.request.urlretrieve(MODEL_URL, zip_path)
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+        zip_ref.extractall(".")
+    os.remove(zip_path)
+    print("Model downloaded and extracted.")
+
+# ------------------------
+# Step 2: Load model
+# ------------------------
+model = vosk.Model(MODEL_NAME)
+recognizer = vosk.KaldiRecognizer(model, 16000)  # 16000 Hz sample rate
+
+# ------------------------
+# Step 3: Open test WAV file
+# ------------------------
+
+# Run tests on multiple files
+# In the real thing, change this to the actual file you receive from the Pico
+FILE_NAMES = ["hello", "long_recording", "test_1s", "test_17s", "where_cookies_go", "oh_boy"]
+for FILE_NAME in FILE_NAMES:
+    process_audio_file(FILE_NAME)
