@@ -1,10 +1,9 @@
-# audio.py — MicroPython-safe sampler (no typing)
+# audio.py — MicroPython sampler (no typing imports)
 import utime
 from machine import ADC, Pin
 import _thread
 from config import AUDIO_ADC_PIN, SAMPLE_RATE_HZ, PACKET_SAMPLES, QUEUE_MAX_PACKETS
 
-# Public API (helps readers and some tools)
 __all__ = ["start", "stop", "try_acquire_packet"]
 
 _adc = None
@@ -64,13 +63,3 @@ def try_acquire_packet():
         if _queue:
             return _queue.pop(0)
     return None
-
-# NOTE: Do not import this module inside itself (no `import audio` here).
-# If you want to test from PC/REPL, use `main.py` or call start()/stop() directly
-# under a guard like below:
-if __name__ == "__main__":
-    # minimal self-test (optional; comment out if you prefer)
-    start()
-    utime.sleep_ms(50)
-    _ = try_acquire_packet()
-    stop()
