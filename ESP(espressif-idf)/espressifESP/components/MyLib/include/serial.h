@@ -10,7 +10,7 @@
 #define UART_PORT_NUM      UART_NUM_0  // UART0 for ESP32-CAM
 #define UART_BAUD_RATE     115200
 #define UART_BUF_SIZE      1024
-#define MAX_FILE_SIZE      (100 * 1024)
+#define MAX_FILE_SIZE      (64 * 1024)
 #define PICO_CHUNK         256
 
 #include "serial.h"

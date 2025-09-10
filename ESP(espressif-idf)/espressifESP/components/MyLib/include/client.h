@@ -12,4 +12,6 @@ bool pingServer(const char* url);
 
 void stream_task(void *pvParameters);
 
+char ServoCommand();
+
 #endif // CLIENT_H

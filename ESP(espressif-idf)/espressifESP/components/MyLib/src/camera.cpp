@@ -42,9 +42,9 @@ camera_config_t camera_config = {
     .ledc_timer     = LEDC_TIMER_0,
     .ledc_channel   = LEDC_CHANNEL_0,
     .pixel_format   = PIXFORMAT_JPEG,
-    .frame_size     = FRAMESIZE_HVGA,
+    .frame_size     = FRAMESIZE_SVGA,
     .jpeg_quality   = 10,
-    .fb_count       = 2,
+    .fb_count       = 1,
 
     .fb_location    = CAMERA_FB_IN_PSRAM,
     .grab_mode      = CAMERA_GRAB_WHEN_EMPTY,

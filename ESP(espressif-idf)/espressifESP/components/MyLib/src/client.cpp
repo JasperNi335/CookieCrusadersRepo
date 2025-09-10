@@ -2,6 +2,27 @@
 
 static const char* TAG = "CLIENT";
 
+char ServoCommandChar = 'M';
+
+esp_err_t _http_event_handler(esp_http_client_event_t *evt){
+    switch(evt->event_id){
+        case HTTP_EVENT_ON_DATA:
+            if (evt->data_len > 0){
+                // evt->data is a pointer to the data
+                ServoCommandChar = ((char*)evt->data)[0];
+                ESP_LOGI(TAG, "Received char: %c", ServoCommandChar);
+            }
+            break;
+        default:
+            break;
+    }
+    return ESP_OK;
+}
+
+char ServoCommand(){
+    return ServoCommandChar;
+}
+
 void stream_task(void *pvParameters) {
     while (true) {
         camera_fb_t *fb = esp_camera_fb_get();
@@ -10,9 +31,10 @@ void stream_task(void *pvParameters) {
             continue;
         }
 
-        esp_http_client_config_t config = {0};
+        esp_http_client_config_t config = {};
         config.url = SERVER_URL;
         config.method = HTTP_METHOD_POST;
+        config.event_handler = _http_event_handler;
 
         esp_http_client_handle_t client = esp_http_client_init(&config);
 
@@ -32,3 +54,5 @@ void stream_task(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(100)); // ~10 FPS
     }
 }
+
+

@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "client.h"
 
 #define SERVO_PIN    13
 #define SERVO_MIN_US 500
@@ -19,5 +20,9 @@ void servo_write_us(int us);
 
 // Sweep servo back and forth
 void servo_sweep();
+
+void servo_move(char command);
+
+void servo_update_task(void *pvParameters);
 
 #endif // SERVO_H

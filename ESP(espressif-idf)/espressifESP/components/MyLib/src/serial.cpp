@@ -34,51 +34,92 @@ void serial_send_task(void *pvParameters) {
     }
 }
 
-uint8_t* wav_buffer = NULL;
-size_t wav_size = 0;
+#define CHUNK_ACK       "OK\n"
+#define CONFIRM_ACK     "CONFIRMED\n"
+
+static uint8_t* wav_buffer = NULL; // PSRAM buffer
+static size_t wav_received = 0;
 
 void receive_wav_task(void* pvParameters) {
-    wav_buffer = (uint8_t*)malloc(MAX_FILE_SIZE);
+    ESP_LOGI(TAG, "UART receiver started");
+
+    // Allocate PSRAM buffer
+    wav_buffer = (uint8_t*) heap_caps_malloc(MAX_FILE_SIZE, MALLOC_CAP_SPIRAM);
     if (!wav_buffer) {
-        ESP_LOGE(TAG, "Failed to allocate buffer");
+        ESP_LOGE(TAG, "Failed to allocate PSRAM buffer");
         vTaskDelete(NULL);
+        return;
     }
-
-    ESP_LOGI(TAG, "Start receiving WAV in chunks...");
-
-    wav_size = 0;
-    uint8_t chunk[PICO_CHUNK];
+    wav_received = 0;
 
     while (1) {
-        int received = 0;
-        // Read full chunk
-        while (received < PICO_CHUNK) {
-            int len = uart_read_bytes(UART_PORT_NUM, chunk + received, PICO_CHUNK - received, pdMS_TO_TICKS(500));
-            if (len > 0) received += len;
+        // Peek how many bytes are available
+        size_t avail = 0;
+        uart_get_buffered_data_len(UART_PORT_NUM, &avail);
+
+        if (avail == 2) {
+            // Maybe EOF marker
+            uint8_t eof[2];
+            int len = uart_read_bytes(UART_PORT_NUM, eof, 2, pdMS_TO_TICKS(2000));
+            if (len == 2 && eof[0] == 0xFF && eof[1] == 0xFF) {
+                ESP_LOGI(TAG, "EOF marker received, stopping");
+                break;
+            } else {
+                ESP_LOGW(TAG, "Invalid 2-byte marker received, aborting");
+                break;
+            }
         }
 
-        // Copy to buffer
-        if (wav_size + PICO_CHUNK > MAX_FILE_SIZE) {
-            ESP_LOGW(TAG, "Buffer full, stopping reception");
+        // Otherwise expect a full chunk (256 + 2 marker)
+        uint8_t chunk[PICO_CHUNK + 2];
+        int received = 0;
+        int needed = sizeof(chunk);
+
+        while (received < needed) {
+            int len = uart_read_bytes(UART_PORT_NUM,
+                                      chunk + received,
+                                      needed - received,
+                                      pdMS_TO_TICKS(2000));
+            if (len > 0) {
+                received += len;
+            } else {
+                ESP_LOGW(TAG, "Timeout waiting for chunk");
+                goto finish;
+            }
+        }
+
+        // Validate trailing marker (0xAA 0x55)
+        if (chunk[PICO_CHUNK] != 0xAA || chunk[PICO_CHUNK + 1] != 0x55) {
+            ESP_LOGW(TAG, "Invalid chunk marker, aborting");
+            goto finish;
+        }
+
+        // Copy valid audio data into PSRAM
+        if (wav_received + PICO_CHUNK <= MAX_FILE_SIZE) {
+            memcpy(wav_buffer + wav_received, chunk, PICO_CHUNK);
+            wav_received += PICO_CHUNK;
+            ESP_LOGI(TAG, "Received chunk, total %d bytes", wav_received);
+        } else {
+            ESP_LOGE(TAG, "Buffer overflow, aborting");
+            goto finish;
+        }
+
+        // Send ACK (0xCC)
+        uint8_t ack = 0xCC;
+        uart_write_bytes(UART_PORT_NUM, (const char*)&ack, 1);
+
+        // Wait for CONFIRM (0xDD)
+        uint8_t confirm;
+        int c = uart_read_bytes(UART_PORT_NUM, &confirm, 1, pdMS_TO_TICKS(2000));
+        if (c == 1 && confirm == 0xDD) {
+            ESP_LOGI(TAG, "Sender confirmed ACK");
+        } else {
+            ESP_LOGW(TAG, "No confirmation received, stopping");
             break;
         }
-        memcpy(wav_buffer + wav_size, chunk, PICO_CHUNK);
-        wav_size += PICO_CHUNK;
-
-        ESP_LOGI(TAG, "Received chunk, total %d bytes", wav_size);
-
-        // Send ACK
-        uart_write_bytes(UART_PORT_NUM, "OK", 2);
-
-        // Optional: stop when you reach the known file size
-        // if (wav_size >= FILE_SIZE) break;
     }
 
-    ESP_LOGI(TAG, "Reception finished, WAV size: %d bytes", wav_size);
-
-    // TODO: send wav_buffer to server
-
-    free(wav_buffer);
-    wav_buffer = NULL;
+finish:
+    ESP_LOGI(TAG, "Reception finished, WAV size: %d bytes", wav_received);
     vTaskDelete(NULL);
 }

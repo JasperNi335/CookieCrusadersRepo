@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "servo.h"
 #include "serial.h"
+#include "client.h"
 #include "network.h"
 #include "keys.h"
 #include "esp_http_client.h"
@@ -27,19 +28,23 @@ void setup() {
         ESP_LOGI(TAG, "Camera initialized successfully");
     }
 
+    vTaskDelay(pdMS_TO_TICKS(1000));
+
     ESP_LOGI(TAG, "Setting camera parameters");
     setCameraSettings();
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     ESP_LOGI(TAG, "Setting up WiFi");
     setupWiFi();
     */
-
-    /* Servo browns out to be fixed later.
-    servo_init(SERVO_PIN);
-    ESP_LOGI(TAG, "Setup finished");
-    */
+    
+    // Servo browns out to be fixed later.
+    //servo_init(SERVO_PIN);
 
     serial_init();
+
+    ESP_LOGI(TAG, "Setup finished");
 }
 
 // ESP-IDF entry point
@@ -52,6 +57,7 @@ extern "C" void app_main() {
     //xTaskCreate(serial_receive_task, "serial_receive_task", 4096, NULL, 10, NULL);
     //xTaskCreate(serial_send_task, "serial_send_task", 4096, NULL, 10, NULL);
     xTaskCreate(receive_wav_task, "receive_wav_task", 8192, NULL, 10, NULL);
+    //xTaskCreate(servo_update_task, "servo_movement_task", 2048, nullptr, 5, nullptr);
 
     while(1) {
         vTaskDelay(pdMS_TO_TICKS(1000));
