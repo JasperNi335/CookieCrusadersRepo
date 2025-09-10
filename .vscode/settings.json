@@ -1,3 +1,5 @@
 {
-  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+  "python.defaultInterpreterPath": "C:\\Users\\Johnny Vu\\OneDrive - The University of Auckland\\Documents\\COMPSYS 209\\CookieCrusadersRepo\\.venv\\Scripts\\python.exe",
+  "task.allowAutomaticTasks": "on",
+  "python.terminal.activateEnvironment": false
 }

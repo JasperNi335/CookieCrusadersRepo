@@ -1,6 +1,11 @@
 {
     "typeCheckingMode": "basic",
-    "reportMissingImports": "warning",
+    "reportMissingImports": "none",
     "reportMissingModuleSource": "none",
-    "exclude": ["**/build", ".venv"]
+    "venvPath": ".",
+    "venv": ".venv",
+    "exclude": [
+      ".venv",
+      "**/__pycache__"
+    ]
 }  

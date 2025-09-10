@@ -1,144 +1,221 @@
-from typing import Optional, Any, BinaryIO, cast
-import sys
-import struct
-import utime                    # MicroPython time module (has sleep_ms, ticks_*)
+# main.py — voice trigger -> play random WAV
+import os, utime
 from machine import Pin, PWM
+import urandom
 
 from config import (
-    FRAMING_MAGIC, ENABLE_USB_STREAM,
     LED_PIN, SPEAKER_PIN,
-    BEEP_TONE_HZ, BEEP_MS, BEEP_GAP_MS,
-    ENV_CENTER, ENV_THRESH, ENV_HANG_MS,
+    ENV_THRESH, ENV_HANG_MS,
+    PLOT_DEBUG, SOUNDS_DIR, SOUND_FILES,
+    MAX_WAV_MS, WAV_CHUNK_BYTES
 )
 import audio
 
+# ----------------- hardware: LED + hard-mute speaker when idle -----------------
+_led = Pin(LED_PIN, Pin.OUT)
+def led(on): _led.value(1 if on else 0)
 
-# ---------- PWM tone helpers ----------
-def pwm_tone_start(pin_num: int, freq_hz: int) -> PWM:
-    pwm = PWM(Pin(pin_num))
-    pwm.freq(int(freq_hz))
-    pwm.duty_u16(32768)  # ~50%
-    return pwm
+# Drive speaker line LOW when idle so the amp input is not floating (kills hiss).
+_idle_spk = Pin(SPEAKER_PIN, Pin.OUT)
+_idle_spk.value(0)
 
-
-def pwm_tone_stop(pwm: PWM) -> None:
-    pwm.deinit()
-
-
-def play_melody(pin_num: int) -> None:
-    seq = (BEEP_TONE_HZ, int(BEEP_TONE_HZ * 1.5), BEEP_TONE_HZ)
-    for idx, f in enumerate(seq):
-        p = pwm_tone_start(pin_num, f)
-        utime.sleep_ms(BEEP_MS)
-        pwm_tone_stop(p)
-        if idx != len(seq) - 1:
-            utime.sleep_ms(BEEP_GAP_MS)
-
-
-# ---------- USB binary write (Pylance-safe) ----------
-def _stdout_binary() -> Optional[BinaryIO]:
-    # getattr(...) is typed as object|None; cast it to BinaryIO|None for Pylance.
-    buf: Any = getattr(sys.stdout, "buffer", None)
-    return cast(Optional[BinaryIO], buf)
-
-def usb_write_all(b: bytes) -> None:
-    bio = _stdout_binary()
-    if bio is not None:
-        bio.write(b)        # bytes -> binary stream
-        bio.flush()
-    else:
-        # Fallback for text-only stdout
-        sys.stdout.write(b.decode("latin-1"))
-        sys.stdout.flush()
-
-
-# ---------- Non-blocking line read (ASCII) ----------
-def read_cmd_nonblock() -> Optional[str]:
-    try:
-        import uselect as select  # MicroPython
-    except ImportError:
-        try:
-            import select         # CPython fallback (rarely used here)
-        except ImportError:
-            return None
-
-    res: Any = select.select([sys.stdin], [], [], 0)
-    # Some stubs mark select() as possibly returning None; guard to appease Pyright.
-    if not res:
+# ----------------- small utils -----------------
+def rand_choice(seq):
+    if not seq:
         return None
-    r, _, _ = res  # type: ignore[assignment]
-    if r:
-        try:
-            line = sys.stdin.readline()
-            if not line:
-                return None
-            return line.strip()
-        except Exception:
-            return None
-    return None
+    idx = urandom.getrandbits(30) % len(seq)
+    return seq[idx]
 
-
-# ---------- Simple envelope detector ----------
-def envelope_u16_le(payload: bytes) -> int:
+def compute_envelope_u16le(frame_bytes):
     """
-    payload: little-endian u16 PCM (0..65535).
-    Return mean absolute deviation around ENV_CENTER.
+    Auto-centered average absolute deviation:
+    1) compute mean of the frame
+    2) average |sample - mean|
     """
-    n = len(payload) // 2
+    n = len(frame_bytes) // 2
     if n == 0:
         return 0
+    s = 0
+    # mean
+    for i in range(0, len(frame_bytes), 2):
+        v = frame_bytes[i] | (frame_bytes[i+1] << 8)
+        s += v
+    mean = s // n
+    # avg abs deviation
     acc = 0
-    mv = memoryview(payload)
-    for i in range(0, len(mv), 2):
-        s = mv[i] | (mv[i + 1] << 8)
-        acc += abs(s - ENV_CENTER)
+    for i in range(0, len(frame_bytes), 2):
+        v = frame_bytes[i] | (frame_bytes[i+1] << 8)
+        acc += (v - mean) if v >= mean else (mean - v)
     return acc // n
 
+# ----------------- WAV playback -----------------
+def _read_exact(f, n):
+    b = f.read(n)
+    if b is None or len(b) < n:
+        return None
+    return b
 
-def main() -> None:
-    led = Pin(LED_PIN, Pin.OUT)
-    led.value(0)
+def _parse_wav_header(f):
+    # minimal RIFF/WAVE parser for PCM mono 8/16-bit
+    # Returns (sample_rate, bits_per_sample, channels, data_start, data_size)
+    if _read_exact(f, 4) != b"RIFF":
+        raise ValueError("Not RIFF")
+    _ = _read_exact(f, 4)  # file size (unused)
+    if _read_exact(f, 4) != b"WAVE":
+        raise ValueError("Not WAVE")
 
-    audio.start()
-
-    next_ok_ms = 0  # cooldown end time (ms)
-    hb_next = utime.ticks_add(utime.ticks_ms(), 500)
+    fmt_sr = None
+    fmt_bps = None
+    fmt_ch  = None
+    data_size = None
+    data_pos  = None
 
     while True:
-        # 1) Host command?
-        cmd = read_cmd_nonblock()
-        if cmd == "BEEP":
-            now = utime.ticks_ms()
-            if utime.ticks_diff(now, next_ok_ms) >= 0:
-                play_melody(SPEAKER_PIN)
-                next_ok_ms = utime.ticks_add(now, ENV_HANG_MS)
+        chunk_id = f.read(4)
+        if not chunk_id:
+            break
+        size_b = _read_exact(f, 4)
+        if size_b is None:
+            break
+        size = (size_b[0] | (size_b[1] << 8) | (size_b[2] << 16) | (size_b[3] << 24))
 
-        # 2) Audio packet: stream (optional) + detect
-        pkt = audio.try_acquire_packet()
-        if pkt is not None:
-            if ENABLE_USB_STREAM:
-                hdr = struct.pack("<IH", FRAMING_MAGIC, len(pkt))
-                usb_write_all(hdr)
-                usb_write_all(pkt)
+        if chunk_id == b"fmt ":
+            fmt = _read_exact(f, size)
+            if fmt is None or len(fmt) < 16:
+                raise ValueError("fmt too short")
+            audio_fmt = fmt[0] | (fmt[1] << 8)      # 1 = PCM
+            fmt_ch = fmt[2] | (fmt[3] << 8)
+            fmt_sr = (fmt[4] | (fmt[5] << 8) | (fmt[6] << 16) | (fmt[7] << 24))
+            # skip byte rate (4) + block align (2)
+            fmt_bps = fmt[14] | (fmt[15] << 8)
+            if audio_fmt != 1:
+                raise ValueError("Only PCM supported")
+        elif chunk_id == b"data":
+            data_pos = f.tell()
+            data_size = size
+            break
+        else:
+            f.seek(size, 1)
 
-            env = envelope_u16_le(pkt)
-            if env >= ENV_THRESH:
-                now = utime.ticks_ms()
-                if utime.ticks_diff(now, next_ok_ms) >= 0:
-                    play_melody(SPEAKER_PIN)
-                    next_ok_ms = utime.ticks_add(now, ENV_HANG_MS)
+    if fmt_sr is None or fmt_bps is None or fmt_ch is None:
+        raise ValueError("Missing fmt")
+    if fmt_ch != 1:
+        raise ValueError("Only mono supported")
+    if fmt_bps not in (8, 16):
+        raise ValueError("Only 8/16-bit PCM supported")
+    if data_pos is None or data_size is None:
+        raise ValueError("Missing data chunk")
 
-        # 3) Heartbeat LED (2 Hz)
-        now = utime.ticks_ms()
-        if utime.ticks_diff(now, hb_next) >= 0:
-            led.toggle()
-            hb_next = utime.ticks_add(now, 500)
+    return fmt_sr, fmt_bps, fmt_ch, data_pos, data_size
 
-        utime.sleep_ms(1)
+def play_wav_file(path, pin=SPEAKER_PIN):
+    """
+    Stream PCM to PWM at the WAV's sample rate.
+    Supports mono 8-bit unsigned and 16-bit signed little-endian PCM.
+    """
+    pwm = PWM(Pin(pin))
+    pwm.freq(100_000)  # ultrasonic carrier to reduce audible whine
+    pwm.duty_u16(0)
 
-
-if __name__ == "__main__":
     try:
-        main()
-    except KeyboardInterrupt:
+        with open(path, "rb") as f:
+            sr, bps, ch, data_pos, data_size = _parse_wav_header(f)
+            f.seek(data_pos)
+            period_us = int(1_000_000 // sr) if sr > 0 else 125
+
+            deadline = utime.ticks_add(utime.ticks_ms(), MAX_WAV_MS)
+            bytes_left = data_size
+
+            while bytes_left > 0 and utime.ticks_diff(deadline, utime.ticks_ms()) > 0:
+                to_read = WAV_CHUNK_BYTES
+                if bps == 16 and (to_read & 1):
+                    to_read += 1  # align to 2 bytes
+                chunk = f.read(to_read)
+                if not chunk:
+                    break
+                bytes_in_chunk = len(chunk)
+                bytes_left -= bytes_in_chunk
+
+                if bps == 8:
+                    for i in range(bytes_in_chunk):
+                        s = chunk[i]  # 0..255 unsigned
+                        pwm.duty_u16(s << 8)  # expand to 16-bit
+                        t_next = utime.ticks_add(utime.ticks_us(), period_us)
+                        while utime.ticks_diff(t_next, utime.ticks_us()) > 0:
+                            pass
+                else:  # 16-bit signed little-endian
+                    i = 0
+                    while i + 1 < bytes_in_chunk:
+                        s = chunk[i] | (chunk[i+1] << 8)
+                        if s & 0x8000:
+                            s -= 0x10000  # sign extend
+                        # map -32768..32767 -> 0..65535
+                        y = s + 32768
+                        if y < 0: y = 0
+                        elif y > 65535: y = 65535
+                        pwm.duty_u16(y)
+                        i += 2
+                        t_next = utime.ticks_add(utime.ticks_us(), period_us)
+                        while utime.ticks_diff(t_next, utime.ticks_us()) > 0:
+                            pass
+    finally:
+        pwm.deinit()
+        # ensure amp input is driven LOW when idle
+        Pin(pin, Pin.OUT).value(0)
+
+# ----------------- sounds list -----------------
+def _discover_sounds():
+    files = []
+    try:
+        for name in os.listdir(SOUNDS_DIR):
+            nm = name.lower()
+            if nm.endswith(".wav"):
+                files.append(SOUNDS_DIR + "/" + name)
+    except Exception:
         pass
+    return files
+
+def _pick_sound():
+    files = SOUND_FILES[:] if SOUND_FILES else _discover_sounds()
+    return rand_choice(files)
+
+# ----------------- app loop -----------------
+def run():
+    audio.start()
+    last_fire_ms = 0
+    try:
+        while True:
+            frame = audio.try_acquire_packet()
+            if frame is None:
+                utime.sleep_ms(5)
+                continue
+
+            env = compute_envelope_u16le(frame)
+            if PLOT_DEBUG:
+                print("env," + str(env))
+
+            now = utime.ticks_ms()
+            if env >= ENV_THRESH and utime.ticks_diff(now, last_fire_ms) >= ENV_HANG_MS:
+                snd = _pick_sound()
+                if snd:
+                    led(True)
+                    play_wav_file(snd, SPEAKER_PIN)
+                    led(False)
+                last_fire_ms = now
+    finally:
+        audio.stop()
+        # keep speaker muted on exit
+        Pin(SPEAKER_PIN, Pin.OUT).value(0)
+
+# ------------- handy tests from REPL -------------
+def beep_test(pin=SPEAKER_PIN, ms=500, freq=1000, duty=20000):
+    p = PWM(Pin(pin))
+    p.freq(freq)
+    p.duty_u16(duty)
+    utime.sleep_ms(ms)
+    p.deinit()
+    Pin(pin, Pin.OUT).value(0)
+
+# Auto-run on reset; comment out if you prefer manual start.
+if __name__ == "__main__":
+    run()

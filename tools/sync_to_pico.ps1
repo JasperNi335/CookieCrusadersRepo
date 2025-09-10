@@ -1,47 +1,96 @@
+# tools/sync_to_pico.ps1
+# Usage (from tasks.json): powershell -NoProfile -ExecutionPolicy Bypass -File tools\sync_to_pico.ps1 -Py .venv\Scripts\python.exe
+# You can also run it directly from a VS Code terminal.
+
 param(
-  [string]$Py = "",     # path to python.exe (optional; defaults to .venv)
-  [string]$Port = ""    # e.g. COM6 (optional; lets mpremote auto-pick if empty)
+  [string]$Py = "",              # Optional: path to python.exe; if empty will use "python" on PATH
+  [string]$DeviceDir = "device", # Source dir for .py files
+  [string]$soundsDir = "sounds"  # Source dir for .wav files
 )
 
 $ErrorActionPreference = "Stop"
 
-# Workspace root (script lives in /tools)
-$wsRoot = Split-Path -Path $PSScriptRoot -Parent
+# Resolve workspace root
+$ws = Split-Path $PSScriptRoot -Parent
+Set-Location $ws
 
-# Resolve python path (default to .venv)
-if (-not $Py -or -not (Test-Path -LiteralPath $Py)) {
-  $Py = Join-Path $wsRoot ".venv\Scripts\python.exe"
-  if (-not (Test-Path -LiteralPath $Py)) {
-    Write-Error "Python not found. Pass -Py <path to python.exe> or create .venv."
+function PyRun {
+  param([string[]]$mpArgs)
+  $python = if ($Py -and (Test-Path $Py)) { $Py } else { "python" }
+  & $python -m mpremote @mpArgs
+}
+
+function Get-FirstPort {
+  try {
+    $out = PyRun @("devs") 2>$null
+    if (-not $out) { return $null }
+    foreach ($line in $out) {
+      if ($line -match "COM\d+") {
+        return ($matches[0])
+      }
+    }
+  } catch {
+    return $null
+  }
+  return $null
+}
+
+function Wait-For-Device {
+  param([int]$TimeoutMs = 20000)
+  $deadline = [DateTime]::UtcNow.AddMilliseconds($TimeoutMs)
+  while ([DateTime]::UtcNow -lt $deadline) {
+    $port = Get-FirstPort
+    if ($port) { return $true }
+    Start-Sleep -Milliseconds 500
+  }
+  return $false
+}
+
+Write-Host "Checking for MicroPython device..."
+
+if (-not (Wait-For-Device)) {
+  $hint = @(
+    "MicroPython device not found after waiting.",
+    "Tips:",
+    "  - Make sure the board is NOT in BOOTSEL (RPI-RP2 drive should NOT be visible).",
+    "  - Close Thonny or any serial monitor so the port is free.",
+    "  - Unplug/replug USB, wait 2-3 seconds.",
+    "  - Run 'Host: List COM ports' to confirm Windows sees it."
+  )
+  throw ($hint -join "`n")
+}
+
+# Copy Python files
+$files = @("boot.py","config.py","audio.py","main.py")
+foreach ($f in $files) {
+  $src = Join-Path $ws (Join-Path $DeviceDir $f)
+  if (Test-Path $src) {
+    Write-Host ("  cp " + $src + " -> :" + $f)
+    PyRun @("connect","auto","cp",$src,":$f")
+  } else {
+    Write-Host ("  (skip missing file: " + $src + ")")
   }
 }
 
-# Files to push (absolute paths)
-$files = @(
-  (Join-Path $wsRoot "device\boot.py"),
-  (Join-Path $wsRoot "device\config.py"),
-  (Join-Path $wsRoot "device\audio.py"),
-  (Join-Path $wsRoot "device\main.py")
-)
+# Copy WAV sounds (if present)
+$assDir = Join-Path $ws $soundsDir
+if (Test-Path $assDir) {
+  $wavs = Get-ChildItem -Path $assDir -Filter *.wav -File -ErrorAction SilentlyContinue
+  if ($wavs.Count -gt 0) {
+    # Try to ensure /sounds exists on device (ignore errors if it already exists)
+    try { PyRun @("connect","auto","mkdir",":sounds") } catch { }
 
-foreach ($f in $files) {
-  if (-not (Test-Path -LiteralPath $f)) {
-    Write-Error "Missing file: $f"
+    foreach ($w in $wavs) {
+      $dst = ":sounds/" + $w.Name
+      Write-Host ("  cp " + $w.FullName + " -> " + $dst)
+      PyRun @("connect","auto","cp",$w.FullName,$dst)
+    }
+  } else {
+    Write-Host "  (no .wav files found in sounds/; skipping WAV copy)"
   }
-}
-
-# Build base arg list for mpremote
-$base = @("-m", "mpremote")
-if ($Port) { $base += @("connect", $Port) }
-
-Write-Host "Syncing files to Pico..."
-foreach ($f in $files) {
-  $dest = ":" + [System.IO.Path]::GetFileName($f)
-  Write-Host ("  cp {0} -> {1}" -f $f, $dest)
-  & $Py @base "cp" $f $dest
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+} else {
+  Write-Host "  (no sounds folder; skipping WAV copy)"
 }
 
 Write-Host "Resetting device..."
-& $Py @base "reset"
-exit $LASTEXITCODE
+PyRun @("connect","auto","reset")

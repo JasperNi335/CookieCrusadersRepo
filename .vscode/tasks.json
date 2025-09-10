@@ -6,8 +6,11 @@
       "type": "shell",
       "command": "python",
       "args": ["tools/bootstrap.py"],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
       "problemMatcher": []
     },
+
     {
       "label": "Firmware: Flash MicroPython UF2",
       "type": "shell",
@@ -18,9 +21,10 @@
         "-File", "${workspaceFolder}\\tools\\flash_uf2.ps1",
         "-Py", "${workspaceFolder}\\.venv\\Scripts\\python.exe"
       ],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated" }
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
+      "problemMatcher": []
     },
+
     {
       "label": "Device: Sync to Pico",
       "type": "shell",
@@ -30,38 +34,68 @@
         "-ExecutionPolicy", "Bypass",
         "-File", "${workspaceFolder}\\tools\\sync_to_pico.ps1",
         "-Py", "${workspaceFolder}\\.venv\\Scripts\\python.exe"
-        // To force a specific COM port, add: , "-Port", "COM6"
       ],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated" }
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
+      "problemMatcher": []
     },
+
+    {
+      "label": "Device: Clean & Reboot",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}\\tools\\clean_device.ps1",
+        "-Py", "${workspaceFolder}\\.venv\\Scripts\\python.exe"
+      ],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
+      "problemMatcher": []
+    },
+
     {
       "label": "Device: REPL (mpremote)",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
       "args": ["-m", "mpremote", "repl"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
       "problemMatcher": []
     },
+
     {
       "label": "Host: List COM ports",
       "type": "shell",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools\\list_ports.py"],
+      "args": ["tools/list_ports.py"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
       "problemMatcher": []
     },
+
     {
-      "label": "Host: Send BEEP (auto-port)",
+      "label": "Ensure venv (auto)",
       "type": "shell",
-      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools\\kws_cookie_over_serial.py", "--beep"],
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "${workspaceFolder}\\tools\\ensure_venv.ps1",
+        "-Workspace", "${workspaceFolder}"
+      ],
+      "options": { "cwd": "${workspaceFolder}" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false },
       "problemMatcher": []
     },
+
     {
-      "label": "Host: Read 1 frame (auto-port)",
-      "type": "shell",
-      "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
-      "args": ["tools\\kws_cookie_over_serial.py", "--frames", "1"],
-      "problemMatcher": []
+      "label": "Auto: Ensure venv + Deploy on open",
+      "dependsOn": [
+        "Ensure venv (auto)",
+        "Device: Sync to Pico"
+      ],
+      "dependsOrder": "sequence",
+      "runOptions": { "runOn": "folderOpen" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": false }
     }
   ]
 }

@@ -3,10 +3,13 @@
 __pycache__/
 *.pyc
 
-# VS Code
-.vscode/*.db
+# VS Code local stuff (keep tasks/keybindings in repo)
 .vscode/*.log
+.vscode/.history/
 
-# OS
+# Misc
 .DS_Store
 Thumbs.db
+
+# UF2 file (for drag-and-drop programming)
+*.uf2

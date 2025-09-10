@@ -1,59 +1,57 @@
 param(
-  [string]$Py = "",   # Path to python.exe (optional) for mpremote
-  [string]$UF2 = ""   # Path to the UF2 to flash (optional). If empty, we auto-pick.
+  # Optional: point to a specific UF2. If blank, we'll pick the newest *.uf2 in the repo root.
+  [string]$UF2 = "",
+  # Python to run mpremote with (we pass your venv's python from tasks.json)
+  [string]$Py = "python"
 )
 
 $ErrorActionPreference = "Stop"
 
-# Workspace root (this script is in /tools)
-$wsRoot = Split-Path -Path $PSScriptRoot -Parent
-
-# Pick a UF2 if not provided: prefer files starting with "micro", else any *.uf2 in repo root.
-if (-not $UF2 -or -not (Test-Path -LiteralPath $UF2)) {
-  $uf2Cand = Get-ChildItem -Path $wsRoot -Filter micro*.uf2 -File -ErrorAction SilentlyContinue |
-             Sort-Object LastWriteTime -Descending | Select-Object -First 1
-  if (-not $uf2Cand) {
-    $uf2Cand = Get-ChildItem -Path $wsRoot -Filter *.uf2 -File -ErrorAction SilentlyContinue |
-               Sort-Object LastWriteTime -Descending | Select-Object -First 1
+function Find-UF2 {
+  param([string]$Root)
+  if ($UF2 -ne "" -and (Test-Path $UF2)) { return (Resolve-Path $UF2).Path }
+  $candidates = Get-ChildItem -Path $Root -Filter *.uf2 -File | Sort-Object LastWriteTime -Descending
+  if ($candidates.Count -eq 0) {
+    throw "No .uf2 found in $Root. Put a MicroPython UF2 in the repo root or pass -UF2 <path>."
   }
-  if (-not $uf2Cand) {
-    Write-Error "No UF2 found in: $wsRoot. Put your MicroPython UF2 in the repo root or pass -UF2 <path>."
-  }
-  $UF2 = $uf2Cand.FullName
+  return $candidates[0].FullName
 }
 
-Write-Host ("Using UF2: " + $UF2)
+$ws = Split-Path $PSScriptRoot -Parent
+$uf2Path = Find-UF2 -Root $ws
+Write-Host "Using UF2: $uf2Path"
 
-# Try to enter BOOTSEL via mpremote (works when board is already running MicroPython)
-if ($Py -and (Test-Path -LiteralPath $Py)) {
-  Write-Host "Attempting to enter BOOTSEL via mpremote..."
-  try {
-    & $Py -m mpremote exec "import machine; machine.bootloader()" | Out-Null
-    Start-Sleep -Milliseconds 800
-  } catch {
-    Write-Host "mpremote bootloader() call failed (device may not be in MicroPython yet). Continuing..."
-  }
-}
-
-# Wait up to 30s for RPI-RP2 mass-storage drive
-$drive = $null
-for ($i = 1; $i -le 60; $i++) {
-  try {
-    $drive = Get-CimInstance -ClassName Win32_LogicalDisk -ErrorAction SilentlyContinue |
-             Where-Object { $_.VolumeName -eq "RPI-RP2" } | Select-Object -First 1
-  } catch {
-    $drive = $null
-  }
-  if ($drive) { break }
+# Try to enter BOOTSEL (ROM) via MicroPython if the board is currently running it.
+try {
+  & $Py -m mpremote exec "import machine; machine.bootloader()" | Out-Null
   Start-Sleep -Milliseconds 500
+} catch {
+  Write-Host "mpremote not available or board not in MicroPython; will look for BOOTSEL drive..."
 }
 
+# Wait for the UF2 drive to appear
+$drive = $null
+for ($i=0; $i -lt 40; $i++) {
+  $drive = Get-CimInstance Win32_LogicalDisk |
+           Where-Object { $_.VolumeName -eq "RPI-RP2" } |
+           Select-Object -First 1
+  if ($drive) { break }
+  Start-Sleep -Milliseconds 250
+}
 if (-not $drive) {
-  Write-Error "RPI-RP2 drive not found. Hold BOOTSEL and plug in the Pico, then re-run this task."
+  throw "BOOTSEL drive 'RPI-RP2' not found. Hold BOOTSEL while plugging USB, then re-run."
 }
 
-$dest = ($drive.DeviceID + "\")
-Write-Host ("Flashing to: " + $dest)
-Copy-Item -LiteralPath $UF2 -Destination $dest -Force
+Write-Host "Flashing to $($drive.DeviceID)..."
+Copy-Item -Path $uf2Path -Destination "$($drive.DeviceID)\" -Force
 
-Write-Host "Firmware flashed successfully. The Pico will reboot into MicroPython."
+# Wait for drive to disappear (device reboots)
+for ($i=0; $i -lt 40; $i++) {
+  $still = Get-CimInstance Win32_LogicalDisk |
+           Where-Object { $_.VolumeName -eq "RPI-RP2" } |
+           Select-Object -First 1
+  if (-not $still) { break }
+  Start-Sleep -Milliseconds 250
+}
+
+Write-Host "Firmware flashed. The Pico is rebooting into MicroPython."
