@@ -31,20 +31,16 @@ def convert_to_mono_16k_pcm(input_file, output_file="converted.wav"):
     return output_file
 
 
-def process_audio_file(FILE_NAME):
+def process_audio_file(audio_file):
     """ 
     Process a single audio file for speech recognition 
     
-    This function expects the audio file to be in the "testing_audio" directory
-    and to be named as {FILE_NAME}.wav. That might need to be changed if necessary
-
     The input .wav file should be mono, 16-bit PCM, 16kHz. If not, the function will
     attempt to convert it using the `convert_to_mono_16k_pcm` function, which requires
     more processing time, plus the `soundfile` and `scipy` libraries.
 
     This function will work with files of any length.
     """
-    audio_file = os.path.join(os.path.dirname(__file__), "testing_audio", f"{FILE_NAME}.wav")
     final_text = []
 
     opened = False
@@ -115,8 +111,24 @@ recognizer = vosk.KaldiRecognizer(model, 16000)  # 16000 Hz sample rate
 # Step 3: Open test WAV file
 # ------------------------
 
-# Run tests on multiple files
-# In the real thing, change this to the actual file you receive from the Pico
-FILE_NAMES = ["hello", "long_recording", "test_1s", "test_17s", "where_cookies_go", "oh_boy"]
-for FILE_NAME in FILE_NAMES:
-    process_audio_file(FILE_NAME)
+# ------------------------
+# Step 2: Loop for multiple files
+# ------------------------
+while True:
+    file_name = input("Enter WAV filename (or 'q' to quit): ").strip()
+    if file_name.lower() in ("q", "quit", "exit"):
+        break
+
+    if file_name == "":
+        continue
+
+    audio_file = os.path.join(os.path.dirname(__file__), "testing_audio", f"{file_name}.wav")
+
+    if not os.path.exists(audio_file):
+        print("File not found:", audio_file)
+        continue
+
+    try:
+        process_audio_file(audio_file)
+    except Exception as e:
+        print("Error:", e)
