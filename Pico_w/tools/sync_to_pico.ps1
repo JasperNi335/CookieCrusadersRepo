@@ -1,11 +1,7 @@
-# tools/sync_to_pico.ps1
-# Usage (from tasks.json): powershell -NoProfile -ExecutionPolicy Bypass -File tools\sync_to_pico.ps1 -Py .venv\Scripts\python.exe
-# You can also run it directly from a VS Code terminal.
-
 param(
   [string]$Py = "",              # Optional: path to python.exe; if empty will use "python" on PATH
-  [string]$DeviceDir = "device", # Source dir for .py files
-  [string]$soundsDir = "sounds"  # Source dir for .wav files
+  [string]$DeviceDir = "Pico_w\\device", # Source dir for .py files
+  [string]$soundsDir = "Pico_w\\sounds"  # Source dir for .wav files
 )
 
 $ErrorActionPreference = "Stop"

@@ -1,4 +1,3 @@
-# tools/clean_device.ps1
 param(
   [string]$Py = "",
   [string]$Port = ""
@@ -8,7 +7,7 @@ $ErrorActionPreference = "Stop"
 $wsRoot = Split-Path -Path $PSScriptRoot -Parent
 
 if (-not $Py -or -not (Test-Path -LiteralPath $Py)) {
-  $Py = Join-Path $wsRoot ".venv\Scripts\python.exe"
+  $Py = Join-Path $wsRoot "Pico_w\.venv\Scripts\python.exe"
   if (-not (Test-Path -LiteralPath $Py)) {
     Write-Error "Python not found. Pass -Py <path to python.exe> or create .venv."
   }

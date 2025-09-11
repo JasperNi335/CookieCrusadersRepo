@@ -1,7 +1,5 @@
 param(
-  # Optional: point to a specific UF2. If blank, we'll pick the newest *.uf2 in the repo root.
   [string]$UF2 = "",
-  # Python to run mpremote with (we pass your venv's python from tasks.json)
   [string]$Py = "python"
 )
 

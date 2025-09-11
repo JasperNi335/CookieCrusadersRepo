@@ -3,7 +3,7 @@ param(
   [string]$Workspace
 )
 
-$py = Join-Path $Workspace ".venv\Scripts\python.exe"
+$py = Join-Path $Workspace "Pico_w\.venv\Scripts\python.exe"
 
 Write-Host "Workspace: $Workspace"
 if (Test-Path -LiteralPath $py) {
@@ -12,7 +12,7 @@ if (Test-Path -LiteralPath $py) {
 }
 
 Write-Host "No venv found -> bootstrapping..."
-$bootstrap = Join-Path $Workspace "tools\bootstrap.py"
+$bootstrap = Join-Path $Workspace "Pico_w\tools\bootstrap.py"
 
 # Use the user's Python on PATH to run the bootstrap
 & python $bootstrap

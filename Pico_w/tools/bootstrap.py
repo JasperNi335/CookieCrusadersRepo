@@ -1,4 +1,3 @@
-# tools/bootstrap.py
 import os, sys, subprocess, venv, json
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,7 +52,7 @@ def main():
     install_deps(py)
     config_vscode(py)
     print("\n✅ Bootstrap complete.")
-    print("Next:")
+    print("Next: ")
     print(" - Place a MicroPython UF2 (Pico/Pico W) in repo root if needed.")
     print(" - Run: ‘Firmware: Flash MicroPython UF2’ then ‘Pico: Deploy’ from VS Code tasks.")
 
