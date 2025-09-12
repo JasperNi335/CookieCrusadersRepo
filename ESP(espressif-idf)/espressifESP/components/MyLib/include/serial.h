@@ -23,6 +23,4 @@ void serial_receive_task(void *pvParameters);
 // Optional task to periodically send a message
 void serial_send_task(void *pvParameters);
 
-void receive_wav_task(void* pvParameters);
-
 #endif // SERIAL_H

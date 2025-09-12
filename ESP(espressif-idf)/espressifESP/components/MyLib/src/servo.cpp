@@ -83,8 +83,8 @@ void servo_update_task(void *pvParameters){
     while(1){
         char c = ServoCommand(); // 'L', 'R', 'M'
         ESP_LOGI(TAG, "current command %c", c);
-        if (c == 'L' && servo_pos > 0) servo_pos -= 5;
-        else if (c == 'R' && servo_pos < 180) servo_pos += 5;
+        if (c == 'L' && servo_pos > 0) servo_pos -= 1;
+        else if (c == 'R' && servo_pos < 180) servo_pos += 1;
         // 'M' does nothing (hold)
 
         int pulse = SERVO_MIN_US + (servo_pos * (SERVO_MAX_US - SERVO_MIN_US) / 180);

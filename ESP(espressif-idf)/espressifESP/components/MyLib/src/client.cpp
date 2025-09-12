@@ -5,6 +5,11 @@ static const char* TAG = "CLIENT";
 char ServoCommandChar = 'M';
 
 esp_err_t _http_event_handler(esp_http_client_event_t *evt){
+    char url[128];
+    esp_http_client_get_url(evt->client, url, sizeof(url));
+
+    ESP_LOGI(TAG, "Got event from URL: %s", url);
+
     switch(evt->event_id){
         case HTTP_EVENT_ON_DATA:
             if (evt->data_len > 0){
