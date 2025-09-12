@@ -2,3 +2,4 @@
 Data
 __pycache__
 **/tmp/*.jpg
+**/models/vosk-model-en-us-0.22
