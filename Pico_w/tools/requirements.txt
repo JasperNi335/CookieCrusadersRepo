@@ -1,4 +1,0 @@
-mpremote
-pyserial
-micropython-stdlib-stubs
-micropython-rp2-pico-stubs  
