@@ -7,22 +7,40 @@
 #include "esp_log.h"
 #include "client.h"
 
-#define SERVO_PIN    13
-#define SERVO_MIN_US 500
-#define SERVO_MAX_US 2500
-#define SERVO_FREQ   50     // 50 Hz
+/* ------------ Servo instance type ------------ */
+typedef struct {
+    int               gpio_pin;
+    int               min_us;
+    int               max_us;
+    uint32_t          freq_hz;
 
-// Initialize LEDC for servo
-void servo_init(int gpio_pin);
+    ledc_mode_t       speed_mode;
+    ledc_timer_t      timer;
+    ledc_channel_t    channel;
+    ledc_timer_bit_t  duty_resolution;
+} servo_t;
 
-// Move servo to specific pulse width in microseconds
-void servo_write_us(int us);
+/* ------------ Predefined servo objects ------------ */
+extern servo_t SERVO_HEAD;
+extern servo_t SERVO_LEFT;
+extern servo_t SERVO_RIGHT;
 
-// Sweep servo back and forth
-void servo_sweep();
+/* ------------ Task args type ------------ */
+typedef char (*servo_cmd_fn_t)(void);
 
-void servo_move(char command);
+typedef struct {
+    servo_t*       servo;
+    int            start_deg;
+    int            step_deg;
+    int            period_ms;
+    servo_cmd_fn_t get_cmd;
+} servo_task_args_t;
 
+/* ------------ API ------------ */
+void servo_init(servo_t* s);
+void servo_write_us(servo_t* s, int us);
+void servo_set_angle_deg(servo_t* s, int deg);
+void servo_sweep(servo_t* s, int step_us, int delay_ms);
 void servo_update_task(void *pvParameters);
 
 #endif // SERVO_H
