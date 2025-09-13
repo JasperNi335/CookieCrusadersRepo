@@ -26,13 +26,44 @@ void serial_receive_task(void *pvParameters) {
     }
 }
 
-/*
-void serial_send_task(void *pvParameters) {
-    
-    uart_write_bytes(UART_PORT_NUM, msg, strlen(msg));
-    vTaskDelay(pdMS_TO_TICKS(2000)); // send every 2 seconds
+void serial_send_test(void *pvParameters) {
+    const char *test_msg = "Hello UART!\n";
+    uint8_t rx_buffer[128];
+
+    while (1) {
+        // Send message
+        uart_write_bytes(UART_PORT_NUM, test_msg, strlen(test_msg));
+        ESP_LOGI("UART_TEST", "Sent: %s", test_msg);
+
+        // Try to read back response
+        int len = uart_read_bytes(UART_PORT_NUM, rx_buffer, sizeof(rx_buffer) - 1, pdMS_TO_TICKS(1000));
+        if (len > 0) {
+            rx_buffer[len] = '\0';  // Null-terminate
+            ESP_LOGI("UART_TEST", "Received: %s", (char*)rx_buffer);
+        } else {
+            ESP_LOGI("UART_TEST", "No data received");
+        }
+
+        // Repeat every 2 seconds
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
 }
 
-void send(const char* msg){
+void serial_send_task(void *pvParameters) {
+    while (1) {
+        char msg = VoiceCommand();        // e.g. 'A'
+        char durationChar = DurationCommand(); // e.g. '2'
 
-}*/
+        // Convert char '2' → int 2
+        int duration = durationChar - '0';
+        if (duration < 0 || duration > 9) {
+            duration = 0; // fallback if not a valid digit
+        }
+
+        // Send message
+        uart_write_bytes(UART_PORT_NUM, &msg, 1);
+
+        // Delay = (duration + 1) seconds
+        vTaskDelay(pdMS_TO_TICKS((duration + 1) * 1000));
+    }
+}

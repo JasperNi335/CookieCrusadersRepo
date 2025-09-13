@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_log.h"
+#include "client.h"
 #include <string.h>
 
 #define UART_PORT_NUM      UART_NUM_0  // UART0 for ESP32-CAM
@@ -22,5 +23,7 @@ void serial_receive_task(void *pvParameters);
 
 // Optional task to periodically send a message
 void serial_send_task(void *pvParameters);
+
+void serial_send_test(void *pvParameters);
 
 #endif // SERIAL_H

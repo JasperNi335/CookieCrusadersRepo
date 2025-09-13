@@ -12,6 +12,12 @@ bool pingServer(const char* url);
 
 void stream_task(void *pvParameters);
 
+void audio_task(void *pvParameters);
+
 char ServoCommand();
+
+char VoiceCommand();
+
+char DurationCommand();
 
 #endif // CLIENT_H
