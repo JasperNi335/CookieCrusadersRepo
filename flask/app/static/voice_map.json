@@ -1,0 +1,32 @@
+{
+    "what is your stomach for": {
+        "letter": "A",
+        "duration": 1,
+        "description": "Where cookies go"
+    },
+    "i got something for you": {
+        "letter": "B",
+        "duration": 1,
+        "description": "Oh boy"
+    },
+    "what does c stand for": {
+        "letter": "C",
+        "duration": 1,
+        "description": "C is for cookie"
+    },
+    "cookie": {
+        "letter": "D",
+        "duration": 3,
+        "description": "Gasp, cookie!"
+    },
+    "here is a cookie": {
+        "letter": "E",
+        "duration": 4,
+        "description": "Arr Nom Nom"
+    },
+    "i hate you": {
+        "letter": "Z",
+        "duration": 2,
+        "description": "I'm gonna eat your children"
+    }
+}

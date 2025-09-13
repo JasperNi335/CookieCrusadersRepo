@@ -1,4 +1,7 @@
 from app import create_app
+from setup.install_models import install_voice_model
+
+install_voice_model()
 app = create_app()
 
 if __name__ == "__main__":

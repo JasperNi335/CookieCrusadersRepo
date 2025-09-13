@@ -1,5 +1,7 @@
 .venv
+.vscode
 Data
 __pycache__
 **/tmp/*.jpg
+*.zip
 **/models/vosk-model-en-us-0.22

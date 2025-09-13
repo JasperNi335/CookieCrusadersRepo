@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify
 from werkzeug.exceptions import BadRequest
 from ..services.ingest import append_chunk
 from ..services.facial_detection import classify_closest_person
-from ..services.speech_to_text import process_audio_file
+from ..services.speech_recognition import get_listener
 import os, time
 
 bp = Blueprint("api", __name__)
@@ -15,7 +15,7 @@ bp = Blueprint("api", __name__)
 def stream():
     pass
 
-@bp.post("/ingest/image")
+@bp.post("/ingest")
 def ingest_image():
     # accept either multipart (field "chunk") or raw body
     chunk = request.files["chunk"].read() if "chunk" in request.files else request.get_data()
@@ -48,6 +48,12 @@ def ingest_image():
     
     return side, 200
 
-@bp.post("/ingest/audio")
-def ingest_audio():
-    return '', 501
+@bp.get("/audio")
+def get_audio():
+    voice_map = os.path.join(os.path.dirname(__file__), "..", "static", "voice_map.json")
+    sr = get_listener(voice_map)
+    
+    match = sr.get_last_match()
+    if match:
+        return match, 200
+    return "00", 204   # no new phrase
