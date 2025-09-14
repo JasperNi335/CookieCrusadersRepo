@@ -1,0 +1,122 @@
+{
+    "AUDIO_WHERE_COOKIES_GO": {
+        "Letter": "A",
+        "Duration": 1,
+        "Description": "Where cookies go",
+        "Triggers": ["NO COOKIES", "WHERE DO COOKIES GO"]
+    },
+    "AUDIO_OH_BOY": {
+        "Letter": "B",
+        "Duration": 1,
+        "Description": "Oh boy",
+        "Triggers": ["I GOT SOMETHING FOR YOU", "WANNA SEE WHAT I GOT"]
+    },
+    "AUDIO_C_IS_FOR_COOKIE": {
+        "Letter": "C",
+        "Duration": 1,
+        "Description": "C is for cookie",
+        "Triggers": ["WHAT DOES C STAND FOR", "C IS FOR COOKIE", "IDLE"]
+    },
+    "AUDIO_GASP_COOKIE": {
+        "Letter": "D",
+        "Duration": 3,
+        "Description": "Gasp, cookie!",
+        "Triggers": ["HERE IS A COOKIE", "HERE'S A COOKIE"]
+    },
+    "AUDIO_ARRR_NOMNOM": {
+        "Letter": "E",
+        "Duration": 4,
+        "Description": "Arr Nom Nom",
+        "Triggers": ["HERE IS A COOKIE", "TIME TO EAT"]
+    },
+    "AUDIO_VEGGIES": {
+        "Letter": "F",
+        "Duration": 1,
+        "Description": "Veggies",
+        "Triggers": ["EAT YOUR VEGGIES", "DO YOU LIKE VEGGIES", "IDLE"]
+    },
+    "AUDIO_AH": {
+        "Letter": "G",
+        "Duration": 1,
+        "Description": "Ah",
+        "Triggers": ["IDLE", "SIGH"]
+    },
+    "AUDIO_CHEERS": {
+        "Letter": "H",
+        "Duration": 1,
+        "Description": "Cheers",
+        "Triggers": ["BYE", "GOODBYE", "SEE YOU"]
+    },
+    "AUDIO_CHOC_CHIP": {
+        "Letter": "I",
+        "Duration": 1,
+        "Description": "Choc chip",
+        "Triggers": ["DO YOU LIKE CHOCOLATE CHIP", "COOKIE FLAVOR"]
+    },
+    "AUDIO_COOKIE_MONSTER": {
+        "Letter": "J",
+        "Duration": 2,
+        "Description": "Cookie Monster",
+        "Triggers": ["WHO ARE YOU", "WHAT ARE YOU"]
+    },
+    "AUDIO_EAT_COOKIES": {
+        "Letter": "K",
+        "Duration": 1,
+        "Description": "Eat cookies",
+        "Triggers": ["WHAT ARE YOU DOING", "COOKIE TIME"]
+    },
+    "AUDIO_HELLO": {
+        "Letter": "L",
+        "Duration": 1,
+        "Description": "Hello",
+        "Triggers": ["HELLO", "HI", "SUP", "YO", "WHAT'S UP"]
+    },
+    "AUDIO_ME_COOKIE_MONSTER": {
+        "Letter": "M",
+        "Duration": 2,
+        "Description": "Me Cookie Monster",
+        "Triggers": ["WHO ARE YOU", "IDLE"]
+    },
+    "AUDIO_MILK": {
+        "Letter": "N",
+        "Duration": 1,
+        "Description": "Milk",
+        "Triggers": ["HOW DOES IT TASTE", "GOT MILK"]
+    },
+    "AUDIO_NOMNOM": {
+        "Letter": "O",
+        "Duration": 1,
+        "Description": "Nom Nom",
+        "Triggers": ["EATING SOUNDS", "NOM NOM"]
+    },
+    "AUDIO_SECRETLY_ELMO": {
+        "Letter": "P",
+        "Duration": 2,
+        "Description": "Secretly Elmo",
+        "Triggers": ["LOOK LIKE ELMO", "ELMO"]
+    },
+    "AUDIO_WANT_COOKIE": {
+        "Letter": "Q",
+        "Duration": 1,
+        "Description": "Want cookie",
+        "Triggers": ["WHAT DO YOU WANT", "IDLE"]
+    },
+    "AUDIO_WHAT_THE": {
+        "Letter": "R",
+        "Duration": 1,
+        "Description": "What the",
+        "Triggers": ["CONFUSION", "WHAT IS THIS"]
+    },
+    "AUDIO_COOKIE_SONG": {
+        "Letter": "S",
+        "Duration": 5,
+        "Description": "Cookie song",
+        "Triggers": ["SING ALONG", "COOKIE SONG"]
+    },
+    "AUDIO_EAT_CHILDREN": {
+        "Letter": "Z",
+        "Duration": 2,
+        "Description": "I'm gonna eat your children",
+        "Triggers": ["I HATE YOU", "EVIL MODE"]
+    }
+}
