@@ -3,77 +3,127 @@
 
 #include "pico/stdlib.h"
 #include "hardware/adc.h"
-#include <string.h>
+#include "hardware/dma.h"
+#include "hardware/irq.h"
+#include "pico/util/queue.h"
 
-#ifndef AUDIO_RING_SIZE
-#define AUDIO_RING_SIZE  (8192)   // power-of-two makes wrapping easy
-#endif
+#define ADC_GPIO   MIC_GPIO
+#define ADC_INPUT  MIC_ADC_INPUT
 
-static volatile uint16_t wptr = 0;                // write index (0..AUDIO_RING_SIZE-1)
-static int16_t ring[AUDIO_RING_SIZE];             // 16-bit signed samples
-static repeating_timer_t rt;                      // repeating timer for sampling
-static volatile bool running = false;
+typedef struct {
+    uint8_t bytes[AUDIO_HEADER_BYTES + SAMPLES_PER_PKT * sizeof(int16_t)];
+} packet_buf_t;
 
-// Timer ISR-ish callback: sample ADC at SAMPLE_RATE_HZ
-static bool sample_cb(repeating_timer_t *t) {
-    (void)t;
-    if (!running) return true;
+static packet_buf_t pktA, pktB;
+static packet_buf_t* write_pkt;
+static int16_t* wr_samples;
+static uint32_t seq_counter = 0;
 
-    // Raw 12-bit (0..4095) -> center to 0 and scale to ~int16 range
-    uint16_t raw = adc_read();
-    int16_t s = (int16_t)((int)raw - 2048) << 4;
+static int dma_chan;
+static queue_t ready_q;
 
-    ring[wptr] = s;
-    wptr = (wptr + 1) & (AUDIO_RING_SIZE - 1);
-    return true;
+// simple DC blocker to remove mid-rail bias if present
+static float dc_prev_in = 0.f, dc_prev_out = 0.f;
+static inline int16_t dc_block(int16_t x) {
+    const float R = 0.995f; // ~16 Hz cutoff @ 16k
+    float xn = (float)x;
+    float y = (xn - dc_prev_in) + R * dc_prev_out;
+    dc_prev_in = xn;
+    dc_prev_out = y;
+    if (y > 32767.f) y = 32767.f;
+    if (y < -32768.f) y = -32768.f;
+    return (int16_t)y;
+}
+
+static void fill_header(packet_buf_t* p, uint32_t seq) {
+    uint32_t* p32 = (uint32_t*)p->bytes;
+    p32[0] = seq;
+    p32[1] = SAMPLE_RATE_HZ;
+    uint16_t* p16 = (uint16_t*)&p->bytes[sizeof(uint32_t)*2];
+    p16[0] = (uint16_t)SAMPLES_PER_PKT;
+}
+
+static int16_t* payload_ptr(packet_buf_t* p) {
+    return (int16_t*)(p->bytes + AUDIO_HEADER_BYTES);
+}
+
+static void __isr dma_handler(void) {
+    dma_hw->ints0 = 1u << dma_chan;
+
+    // convert raw 12-bit unsigned -> centered int16 and dc-block
+    int16_t* s = payload_ptr(write_pkt);
+    for (int i = 0; i < SAMPLES_PER_PKT; ++i) {
+        uint16_t raw = (uint16_t)s[i];
+        int16_t x = ((int)raw - 2048) << 4; // 12->16 bit with centering
+        s[i] = dc_block(x);
+    }
+
+    uint8_t* pbytes = write_pkt->bytes;
+    queue_try_add(&ready_q, &pbytes);
+
+    write_pkt = (write_pkt == &pktA) ? &pktB : &pktA;
+    fill_header(write_pkt, ++seq_counter);
+    wr_samples = payload_ptr(write_pkt);
+
+    dma_channel_set_write_addr(dma_chan, wr_samples, false);
+    dma_channel_set_trans_count(dma_chan, SAMPLES_PER_PKT, true);
 }
 
 void audio_init(void) {
+    queue_init(&ready_q, sizeof(uint8_t*), 8);
+
+    write_pkt = &pktA;
+    fill_header(write_pkt, seq_counter);
+    wr_samples = payload_ptr(write_pkt);
+
     adc_init();
-    adc_gpio_init(MIC_GPIO);
-    adc_select_input(MIC_ADC_INPUT);
+    adc_gpio_init(ADC_GPIO);
+    adc_select_input(ADC_INPUT);
 
-    running = true;
+    // 48 MHz / div = SAMPLE_RATE_HZ
+    float div = 48000000.0f / (float)SAMPLE_RATE_HZ;
+    adc_set_clkdiv(div);
 
-    const double us_per_sample = 1e6 / (double)SAMPLE_RATE_HZ;
-    const int interval_us = (int)(us_per_sample + 0.5); // ~62 us for 16k
-    add_repeating_timer_us(-interval_us, sample_cb, NULL, &rt);
+    adc_fifo_setup(
+        true,   // enable FIFO
+        true,   // DMA DREQ
+        1,      // threshold
+        false,  // no error bit
+        false   // keep 12-bit in 16-bit
+    );
+
+    dma_chan = dma_claim_unused_channel(true);
+    dma_channel_config c = dma_channel_get_default_config(dma_chan);
+    channel_config_set_transfer_data_size(&c, DMA_SIZE_16);
+    channel_config_set_read_increment(&c, false);
+    channel_config_set_write_increment(&c, true);
+    channel_config_set_dreq(&c, DREQ_ADC);
+
+    dma_channel_configure(
+        dma_chan, &c,
+        wr_samples,
+        &adc_hw->fifo,
+        SAMPLES_PER_PKT,
+        false
+    );
+
+    dma_channel_set_irq0_enabled(dma_chan, true);
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_handler);
+    irq_set_enabled(DMA_IRQ_0, true);
 }
 
-void audio_stop(void) {
-    running = false;
-    cancel_repeating_timer(&rt);
+void audio_start(void) {
+    adc_run(true);
+    dma_channel_start(dma_chan);
 }
 
-void audio_get_recent(int16_t *dst, size_t n) {
-    if (n == 0) return;
-    if (n > AUDIO_RING_SIZE) n = AUDIO_RING_SIZE;
-
-    uint16_t end   = wptr;                                   // snapshot to avoid race
-    uint16_t start = (end - (uint16_t)n) & (AUDIO_RING_SIZE - 1);
-
-    if (start + n <= AUDIO_RING_SIZE) {
-        memcpy(dst, &ring[start], n * sizeof(int16_t));
-    } else {
-        size_t first = AUDIO_RING_SIZE - start;
-        memcpy(dst, &ring[start], first * sizeof(int16_t));
-        memcpy(dst + first, &ring[0], (n - first) * sizeof(int16_t));
+const uint8_t* audio_try_acquire_packet(uint16_t* out_len) {
+    uint8_t* pbytes = NULL;
+    if (queue_try_remove(&ready_q, &pbytes)) {
+        if (out_len) *out_len = AUDIO_HEADER_BYTES + SAMPLES_PER_PKT * sizeof(int16_t);
+        return pbytes;
     }
+    return NULL;
 }
 
-size_t audio_read_block(int16_t *dst, size_t n) {
-    if (n == 0) return 0;
-    if (n > AUDIO_RING_SIZE) n = AUDIO_RING_SIZE;
-
-    uint16_t start_w = wptr;
-    while (((uint16_t)(wptr - start_w)) < (uint16_t)n) {
-        tight_loop_contents();
-    }
-
-    audio_get_recent(dst, n);
-    return n;
-}
-
-void audio_get_frame(int16_t *dst, size_t n) {
-    (void)audio_read_block(dst, n);
-}
+void audio_release_packet(const uint8_t* ptr) { (void)ptr; }

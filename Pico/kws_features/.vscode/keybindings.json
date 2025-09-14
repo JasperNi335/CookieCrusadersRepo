@@ -1,0 +1,8 @@
+[
+    {
+      "key": "ctrl+alt+r",
+      "command": "workbench.action.tasks.runTask",
+      "args": "Clean+Reconfigure",
+      "when": "workspaceFolderCount > 0"
+    }
+]  

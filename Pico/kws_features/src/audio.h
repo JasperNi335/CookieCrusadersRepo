@@ -1,20 +1,19 @@
 #ifndef AUDIO_H
 #define AUDIO_H
-
-#include <stddef.h>
 #include <stdint.h>
 
-void   audio_init(void);                      // starts background ADC sampling
-void   audio_stop(void);
+typedef struct {
+    uint32_t seq;
+    uint32_t sample_rate;
+    uint16_t n;
+    int16_t  samples[];
+} __attribute__((packed)) audio_packet_t;
 
-// Copy the last N samples (oldest..newest) into dst.
-// If N > ring size, it will be clamped.
-void   audio_get_recent(int16_t *dst, size_t n);
+#define AUDIO_HEADER_BYTES (sizeof(uint32_t)*2 + sizeof(uint16_t))
 
-// Block until N new samples have arrived, then copy the last N into dst.
-size_t audio_read_block(int16_t *dst, size_t n);
+void audio_init(void);
+void audio_start(void);
+const uint8_t* audio_try_acquire_packet(uint16_t* out_len);
+void audio_release_packet(const uint8_t* ptr);
 
-// Back-compat thin wrapper around audio_read_block()
-void   audio_get_frame(int16_t *dst, size_t n);
-
-#endif // AUDIO_H
+#endif
