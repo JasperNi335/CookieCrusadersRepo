@@ -34,15 +34,9 @@ def ingest_image():
         return jsonify({"complete": True, "error": "Invalid JPEG"}), 400
 
     # image is complete + valid
-    print("Recieved chunk, image complete")
-    start = time.time()
-    
     image = status["image_bytes"]
     annotated, side = classify_closest_person(image)
-    
-    end = time.time()
-    print(f"Facial recognition ran in {(end - start)*1000:.6f} ms")
-    
+
     with open(os.path.join(os.path.dirname(__file__), "..", "static", "tmp", "output.jpg"), "wb") as f:
         f.write(annotated)
     
@@ -56,4 +50,4 @@ def get_audio():
     match = sr.get_last_match()
     if match:
         return match, 200
-    return "00", 204   # no new phrase
+    return "00", 200   # no new phrase

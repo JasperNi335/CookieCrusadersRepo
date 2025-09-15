@@ -1,5 +1,10 @@
 {
-    "what is your stomach for": {
+    "no cookies": {
+        "letter": "A",
+        "duration": 1,
+        "description": "Where cookies go"
+    },
+    "where do cookies go": {
         "letter": "A",
         "duration": 1,
         "description": "Where cookies go"
@@ -9,22 +14,187 @@
         "duration": 1,
         "description": "Oh boy"
     },
+    "wanna see what i got": {
+        "letter": "B",
+        "duration": 1,
+        "description": "Oh boy"
+    },
     "what does c stand for": {
         "letter": "C",
         "duration": 1,
         "description": "C is for cookie"
     },
-    "cookie": {
-        "letter": "D",
-        "duration": 3,
-        "description": "Gasp, cookie!"
+    "c is for cookie": {
+        "letter": "C",
+        "duration": 1,
+        "description": "C is for cookie"
+    },
+    "idle": {
+        "letter": "C",
+        "duration": 1,
+        "description": "C is for cookie"
     },
     "here is a cookie": {
         "letter": "E",
         "duration": 4,
         "description": "Arr Nom Nom"
     },
+    "here's a cookie": {
+        "letter": "E",
+        "duration": 4,
+        "description": "Arr Nom Nom"
+    },
+    "time to eat": {
+        "letter": "E",
+        "duration": 4,
+        "description": "Arr Nom Nom"
+    },
+    "eat your veggies": {
+        "letter": "F",
+        "duration": 1,
+        "description": "Veggies"
+    },
+    "do you like veggies": {
+        "letter": "F",
+        "duration": 1,
+        "description": "Veggies"
+    },
+    "sigh": {
+        "letter": "G",
+        "duration": 1,
+        "description": "Ah"
+    },
+    "bye": {
+        "letter": "H",
+        "duration": 1,
+        "description": "Cheers"
+    },
+    "goodbye": {
+        "letter": "H",
+        "duration": 1,
+        "description": "Cheers"
+    },
+    "see you": {
+        "letter": "H",
+        "duration": 1,
+        "description": "Cheers"
+    },
+    "do you like chocolate chip": {
+        "letter": "I",
+        "duration": 1,
+        "description": "Choc chip"
+    },
+    "cookie flavor": {
+        "letter": "I",
+        "duration": 1,
+        "description": "Choc chip"
+    },
+    "who are you": {
+        "letter": "J",
+        "duration": 2,
+        "description": "Cookie Monster"
+    },
+    "what are you": {
+        "letter": "J",
+        "duration": 2,
+        "description": "Cookie Monster"
+    },
+    "what are you doing": {
+        "letter": "K",
+        "duration": 1,
+        "description": "Eat cookies"
+    },
+    "cookie time": {
+        "letter": "K",
+        "duration": 1,
+        "description": "Eat cookies"
+    },
+    "hello": {
+        "letter": "L",
+        "duration": 1,
+        "description": "Hello"
+    },
+    "hi": {
+        "letter": "L",
+        "duration": 1,
+        "description": "Hello"
+    },
+    "sup": {
+        "letter": "L",
+        "duration": 1,
+        "description": "Hello"
+    },
+    "yo": {
+        "letter": "L",
+        "duration": 1,
+        "description": "Hello"
+    },
+    "what's up": {
+        "letter": "L",
+        "duration": 1,
+        "description": "Hello"
+    },
+    "how does it taste": {
+        "letter": "N",
+        "duration": 1,
+        "description": "Milk"
+    },
+    "got milk": {
+        "letter": "N",
+        "duration": 1,
+        "description": "Milk"
+    },
+    "eating sounds": {
+        "letter": "O",
+        "duration": 1,
+        "description": "Nom Nom"
+    },
+    "nom nom": {
+        "letter": "O",
+        "duration": 1,
+        "description": "Nom Nom"
+    },
+    "look like elmo": {
+        "letter": "P",
+        "duration": 2,
+        "description": "Secretly Elmo"
+    },
+    "elmo": {
+        "letter": "P",
+        "duration": 2,
+        "description": "Secretly Elmo"
+    },
+    "what do you want": {
+        "letter": "Q",
+        "duration": 1,
+        "description": "Want cookie"
+    },
+    "confusion": {
+        "letter": "R",
+        "duration": 1,
+        "description": "What the"
+    },
+    "what is this": {
+        "letter": "R",
+        "duration": 1,
+        "description": "What the"
+    },
+    "sing along": {
+        "letter": "S",
+        "duration": 5,
+        "description": "Cookie song"
+    },
+    "cookie song": {
+        "letter": "S",
+        "duration": 5,
+        "description": "Cookie song"
+    },
     "i hate you": {
+        "letter": "Z",
+        "duration": 2,
+        "description": "I'm gonna eat your children"
+    },
+    "evil mode": {
         "letter": "Z",
         "duration": 2,
         "description": "I'm gonna eat your children"

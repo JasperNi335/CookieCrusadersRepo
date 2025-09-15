@@ -114,11 +114,11 @@ def box_region(box: Tuple[int,int,int,int], image_width: int) -> str:
     right_cut = 0.6 * image_width
 
     if cx < left_cut:
-        return 'L'
+        return 'R'
     elif cx < right_cut:
         return 'M'
     else:
-        return 'R'
+        return 'L'
 
 def classify_closest_person(
     img_source: Union[bytes, io.BytesIO, np.ndarray, str],
